@@ -7,15 +7,15 @@ from datetime import datetime
 from countries import countries
 
 # Initialize Pygame
+icon = pygame.image.load("data/icon.ico")
+pygame.display.set_icon(icon)
 pygame.init()
-
 # Set up display
 width, height = 800, 600
 screen = pygame.display.set_mode((width, height))
 pygame.display.set_caption("FlagGuessr")
-
 # Load and resize flag images
-flag_size = (200, 150)
+flag_size = (300, 200)
 flags = {country: pygame.transform.scale(pygame.image.load(os.path.join("data/flags", filename)), flag_size) for country, filename in countries.items()}
 
 # Font setup    
@@ -95,6 +95,7 @@ while running:
                     # Correct guess
                     score += 1
                     current_country = random.choice(list(countries.keys()))
+                    print(current_country)
                     input_text = ""
                 else:
                     # Incorrect guess
