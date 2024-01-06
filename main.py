@@ -12,7 +12,7 @@ pygame.init()
 # Set up display
 width, height = 800, 600
 screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption("Guess the Country")
+pygame.display.set_caption("FlagGuessr")
 
 # Load and resize flag images
 flag_size = (200, 150)
