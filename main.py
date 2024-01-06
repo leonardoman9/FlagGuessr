@@ -62,7 +62,7 @@ if song_files:
 
 
 # Game variables
-current_country = random.choice(list(countries.keys())); print(current_country, end = ", ", flush=True)
+current_country = random.choice(list(countries.keys())); print(f"CURRENT GAME SEQUENCE: {current_country}", end = ", ", flush=True)
 score = 0
 lives = 3
 
