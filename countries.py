@@ -47,5 +47,5 @@ countries = {
     "turkey": "turkey.png",
     "ukraine": "ukraine.png",
     "united kingdom": "united kingdom.png",
-    "vatican vity": "vatican city.png",
+    "vatican city": "vatican city.png",
 }

@@ -16,9 +16,9 @@ pygame.display.set_caption("FlagGuessr")
 
 # Load and resize flag images
 flag_size = (200, 150)
-flags = {country: pygame.transform.scale(pygame.image.load(os.path.join("flags", filename)), flag_size) for country, filename in countries.items()}
+flags = {country: pygame.transform.scale(pygame.image.load(os.path.join("data/flags", filename)), flag_size) for country, filename in countries.items()}
 
-# Font setup
+# Font setup    
 font = pygame.font.Font(None, 36)
 
 # Database setup
@@ -52,6 +52,14 @@ def get_top_scores(limit=10):
 
 # Ensure the 'scores' table is created
 create_scores_table()
+
+# Load and play a random song from the "data" folder
+song_files = [f for f in os.listdir("data/music") if f.endswith(".mp3")]
+if song_files:
+    random_song = os.path.join("data/music", random.choice(song_files))
+    pygame.mixer.music.load(random_song)
+    pygame.mixer.music.play(-1)  # -1 makes the music loop indefinitely
+
 
 # Game variables
 current_country = random.choice(list(countries.keys()))
@@ -103,7 +111,7 @@ while running:
                 input_text += event.unicode
 
     # Display the current flag
-    screen.fill((255, 255, 255))  # Set background color to white
+    screen.fill((128, 128, 128))  # Set background color to white
     screen.blit(flags[current_country], (width // 2 - flag_size[0] // 2, height // 2 - flag_size[1] // 2))
 
     # Display score and lives with increased vertical separation
