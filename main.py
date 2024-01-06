@@ -62,7 +62,7 @@ if song_files:
 
 
 # Game variables
-current_country = random.choice(list(countries.keys()))
+current_country = random.choice(list(countries.keys())); print(current_country, end = ", ", flush=True)
 score = 0
 lives = 3
 
@@ -95,7 +95,7 @@ while running:
                     # Correct guess
                     score += 1
                     current_country = random.choice(list(countries.keys()))
-                    print(current_country)
+                    print(current_country, end=", ", flush=True)  
                     input_text = ""
                 else:
                     # Incorrect guess
@@ -155,14 +155,14 @@ while running:
             game_over_text = font.render(f"Game Over - Score: {score}", True, (255, 0, 0))
             screen.blit(game_over_text, (width // 2 - game_over_text.get_width() // 2, height // 2 - game_over_text.get_height() // 2))
 
-            quit_button_rect = pygame.Rect(width // 2 - 100, height // 2 + 50, 100, 50)
+            quit_button_rect = pygame.Rect(width // 2 - 150  , height // 2 + 50, 100, 50)
             pygame.draw.rect(screen, (0, 255, 0), quit_button_rect)
-            quit_text = font.render("Quit", True, (255, 255, 255))
+            quit_text = font.render("Quit", True, (255, 255, 255), (0,128,0))
             screen.blit(quit_text, (quit_button_rect.centerx - quit_text.get_width() // 2, quit_button_rect.centery - quit_text.get_height() // 2))
 
-            rankings_button_rect = pygame.Rect(width // 2 + 20, height // 2 + 50, 140, 50)
+            rankings_button_rect = pygame.Rect(width // 2 + 50, height // 2 + 50, 140, 50)
             pygame.draw.rect(screen, (0, 0, 255), rankings_button_rect)
-            rankings_text = font.render("See Rankings", True, (255, 255, 255))
+            rankings_text = font.render("See Rankings", True, (255, 255, 255), (0,128,0))
             screen.blit(rankings_text, (rankings_button_rect.centerx - rankings_text.get_width() // 2, rankings_button_rect.centery - rankings_text.get_height() // 2))
 
             pygame.display.flip()
