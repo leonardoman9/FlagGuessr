@@ -21,7 +21,7 @@ db_filename = "scores.db"
 # Ensure the 'scores' table is created
 db.create_scores_table(db_filename)
 # Load and play a random song from the "data" folder
-AUDIO = False
+AUDIO = True
 if(AUDIO):
     audio.playMusic()
 #Game constants
