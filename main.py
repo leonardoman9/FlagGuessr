@@ -21,10 +21,13 @@ db_filename = "scores.db"
 # Ensure the 'scores' table is created
 db.create_scores_table(db_filename)
 # Load and play a random song from the "data" folder
-audio.playMusic()
+AUDIO = False
+if(AUDIO):
+    audio.playMusic()
 #Game constants
 MAXLIVES = 3
 INITSCORE = 0
+
 
 # Game variables
 game_countries = countries.countries()
