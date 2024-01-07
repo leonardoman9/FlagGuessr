@@ -1,16 +1,16 @@
 import pygame
 import os
-from countries import countries
+import countries
 import db
 
 class gui:
-    def __init__(self):
+    def __init__(self, game_countries):
         self.width, self.height = 800, 600
         self.screen = pygame.display.set_mode((self.width, self.height))
         self.flag_size = (300, 200)
         self.flags = {country: pygame.transform.scale(pygame.image.load(os.path.join("data/flags", filename)),
                                                     self.flag_size) for country,
-                                                    filename in countries.items()}
+                                                    filename in game_countries.getResult().items()}
         self.font = pygame.font.Font("data/fonts/americancaptain.ttf", 30)
         # Vertical separation between text elements
         self.text_vertical_spacing = 20
@@ -29,6 +29,33 @@ class gui:
         self.quit_button_rect = pygame.Rect(self.width // 2 - 100, self.height // 2 + 50, 100, 50)
         self.rankings_button_rect = pygame.Rect(self.width // 2 + 20, self.height // 2 + 50, 140, 50)
 
+
+    def showSplashScreen(self):
+        self.screen.fill((0, 0, 0))  # Black background
+
+        play_button_rect = pygame.Rect(self.width // 2 - 50, self.height // 2 - 50, 100, 50)
+        rankings_button_rect = pygame.Rect(self.width // 2 - 50, self.height // 2 + 20, 100, 50)
+        quit_button_rect = pygame.Rect(self.width // 2 - 50, self.height // 2 + 90, 100, 50)
+        mute_button_rect = pygame.Rect(self.width - 70, 20, 50, 50)  # Adjust the position as needed
+
+        # Draw buttons
+        pygame.draw.rect(self.screen, (0, 255, 0), play_button_rect)
+        play_text = self.font.render("Play", True, (0, 0, 0))
+        self.screen.blit(play_text, (play_button_rect.centerx - play_text.get_width() // 2, play_button_rect.centery - play_text.get_height() // 2))
+
+        pygame.draw.rect(self.screen, (0, 0, 255), rankings_button_rect)
+        rankings_text = self.font.render("Rankings", True, (0, 0, 0))
+        self.screen.blit(rankings_text, (rankings_button_rect.centerx - rankings_text.get_width() // 2, rankings_button_rect.centery - rankings_text.get_height() // 2))
+
+        pygame.draw.rect(self.screen, (255, 0, 0), quit_button_rect)
+        quit_text = self.font.render("Quit", True, (0, 0, 0))
+        self.screen.blit(quit_text, (quit_button_rect.centerx - quit_text.get_width() // 2, quit_button_rect.centery - quit_text.get_height() // 2))
+
+        pygame.draw.rect(self.screen, (255, 255, 0), mute_button_rect)
+        mute_text = self.font.render("Mute", True, (0, 0, 0))
+        self.screen.blit(mute_text, (mute_button_rect.centerx - mute_text.get_width() // 2, mute_button_rect.centery - mute_text.get_height() // 2))
+
+        pygame.display.flip()
     def showGameOver(self, score, wrong_countries):
         self.screen.fill((0, 0, 0))  # Black background
         game_over_text = self.font.render(f"Game Over - Score: {score}", True, (255, 0, 0))
@@ -122,9 +149,7 @@ class gui:
         return self.mouse_y
 
     def set_mouse_x_y(self, mouse_pos):
-        print(self.mouse_x, ", ", self.mouse_y)
         self.mouse_x, self.mouse_y = mouse_pos
-        print(self.mouse_x, ", ", self.mouse_y)
         return self.mouse_x, self.mouse_y  # Add this line
     def get_quit_button_rect(self):
         return self.quit_button_rect

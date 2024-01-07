@@ -4,7 +4,7 @@ import sys
 import os
 import sqlite3
 from datetime import datetime
-from countries import countries
+import countries
 import scripts
 import audio
 import db
@@ -14,7 +14,7 @@ import gui
 icon = pygame.image.load("data/icon.ico")
 pygame.display.set_icon(icon)
 pygame.init()
-g = gui.gui()
+
 # Database setup
 db_filename = "scores.db"
 
@@ -26,9 +26,9 @@ audio.playMusic()
 MAXLIVES = 3
 INITSCORE = 0
 
-
 # Game variables
-current_country = random.choice(list(countries.keys()))
+game_countries = countries.countries()
+current_country = random.choice(list(game_countries.getResult().keys()))
 countries_list = []
 wrong_countries = []
 print(f"CURRENT GAME SEQUENCE: {current_country}", end=", ", flush=True)
@@ -36,10 +36,14 @@ countries_list.append(current_country)
 score = INITSCORE
 lives = MAXLIVES
 
+
+g = gui.gui(game_countries)
+
 # Game loop
 running = True
 game_over = False
 show_rankings = False
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -54,7 +58,7 @@ while running:
                 if g.get_input_text().lower() == current_country.lower():
                     # Correct guess
                     score += 1
-                    current_country = random.choice(list(countries.keys()))
+                    current_country = random.choice(list(game_countries.getResult().keys()))
                     print(current_country, end=", ", flush=True)
                     countries_list.append(current_country)
                     g.set_input_text("")
@@ -90,6 +94,7 @@ while running:
     input_box_width = max(200, text_surface.get_width() + 10)
     g.get_input_rect().w = input_box_width
     g.getScreen().blit(text_surface, (g.get_input_rect().x + 5, g.get_input_rect().y + 5))
+
 
     pygame.display.flip()
 
