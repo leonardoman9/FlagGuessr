@@ -7,7 +7,7 @@ class gui:
     def __init__(self, game_countries):
         self.width, self.height = 800, 600
         self.screen = pygame.display.set_mode((self.width, self.height))
-        self.flag_size = (300, 200)
+        self.flag_size = (500, 400)
         self.flags = {country: pygame.transform.scale(pygame.image.load(os.path.join("data/flags", filename)),
                                                     self.flag_size) for country,
                                                     filename in game_countries.getResult().items()}
