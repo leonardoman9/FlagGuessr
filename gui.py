@@ -1,6 +1,6 @@
 import pygame
 import os
-import countries
+from countries import countries
 import db
 
 class gui:
@@ -8,18 +8,11 @@ class gui:
         self.width, self.height = 800, 600
         self.screen = pygame.display.set_mode((self.width, self.height))
         self.flag_size = (500, 400)
-        self.flags = {country: pygame.transform.scale(pygame.image.load(os.path.join("data/flags", filename)),
-                                                    self.flag_size) for country,
-                                                    filename in game_countries.getResult().items()}
-        self.font = pygame.font.Font("data/fonts/americancaptain.ttf", 30)
+        self.flags = self.load_flags(game_countries)
+        self.font = pygame.font.Font("./data/fonts/americancaptain.ttf", 30)
         # Vertical separation between text elements
         self.text_vertical_spacing = 20
         # Text input variables
-        self.input_text = ""
-        self.input_border = pygame.Rect(252, self.height - 48, 196, 28)
-        self.input_rect = pygame.Rect(250, self.height - 50, 200, 32)
-        self.input_color = pygame.Color('#FFD700')  # Gold color for input box
-        self.input_active = False# Text input variables
         self.input_text = ""
         self.input_border = pygame.Rect(252, self.height - 48, 196, 28)
         self.input_rect = pygame.Rect(250, self.height - 50, 200, 32)
@@ -29,7 +22,18 @@ class gui:
         self.quit_button_rect = pygame.Rect(self.width // 2 - 100, self.height // 2 + 50, 100, 50)
         self.rankings_button_rect = pygame.Rect(self.width // 2 + 20, self.height // 2 + 50, 140, 50)
 
+    def load_flags(self, game_countries):
+        result = game_countries.getResult()
+        flags = {}
 
+        with countries.connect_db() as conn:
+            cursor = conn.cursor()
+
+            for country, continent in result.items():
+                flag_path = os.path.join("data/flags", continent, f"{country}.png")
+                flags[country] = pygame.transform.scale(pygame.image.load(flag_path), self.flag_size)
+
+        return flags
     def showSplashScreen(self):
         self.screen.fill((0, 0, 0))  # Black background
 
@@ -74,7 +78,6 @@ class gui:
         pygame.display.flip()
 
         pygame.time.delay(50)  # Add a delay to avoid flickering
-
     def showRankings(self, db_filename):
         self.screen.fill((0, 0, 0))  # Black background
         rankings_text = self.font.render("Top 10 Rankings:", True, (255, 255, 255))  # White color for rankings text
@@ -95,30 +98,22 @@ class gui:
         pygame.display.flip()
 
         pygame.time.delay(50)  # Add a delay to avoid flickering
-
     def getWidthHeight(self):
         return self.width, self.height
-
     def getScreen(self):
         return self.screen
-
     def get_height(self):
         return self.height
-
     def get_width(self):
         return self.width
-
     def getFlags(self):
         return self.flags
-
     def getFlagSize(self):
         return self.flag_size
-
     def getFont(self):
         return self.font
     def get_text_vertical_spacing(self):
         return self.text_vertical_spacing
-
     def get_input_text(self):
         return self.input_text
     def get_input_border(self):
@@ -147,7 +142,6 @@ class gui:
         return self.mouse_x
     def get_mouse_y(self):
         return self.mouse_y
-
     def set_mouse_x_y(self, mouse_pos):
         self.mouse_x, self.mouse_y = mouse_pos
         return self.mouse_x, self.mouse_y  # Add this line
@@ -155,4 +149,3 @@ class gui:
         return self.quit_button_rect
     def get_rankings_button_rect(self):    
         return self.rankings_button_rect
-

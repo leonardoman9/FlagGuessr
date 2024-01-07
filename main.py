@@ -46,6 +46,7 @@ g = gui.gui(game_countries)
 running = True
 game_over = False
 show_rankings = False
+print(current_country, end=", ", flush=True)
 
 while running:
     for event in pygame.event.get():
@@ -97,8 +98,6 @@ while running:
     input_box_width = max(200, text_surface.get_width() + 10)
     g.get_input_rect().w = input_box_width
     g.getScreen().blit(text_surface, (g.get_input_rect().x + 5, g.get_input_rect().y + 5))
-
-
     pygame.display.flip()
 
     if game_over:

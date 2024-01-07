@@ -1,73 +1,65 @@
-class countries():
-    def __init__(self):
-        self.european_countries = {
-            "Albania": "albania.png",
-            "Andorra": "andorra.png",
-            "Armenia": "armenia.png",
-            "Austria": "austria.png",
-            "azerbaijan": "azerbaijan.png",
-            "belarus": "belarus.png",
-            "belgium": "belgium.png",
-            "bosnia and herzegovina": "bosnia and herzegovina.png",
-            "bulgaria": "bulgaria.png",
-            "croatia": "croatia.png",
-            "cyprus": "cyprus.png",
-            "czech republic": "czech republic.png",
-            "denmark": "denmark.png",
-            "estonia": "estonia.png",
-            "finland": "finland.png",
-            "germany": "germany.png",
-            "France": "france.png",
-            "georgia": "georgia.png",
-            "greece": "greece.png",
-            "hungary": "hungary.png",
-            "iceland": "iceland.png",
-            "ireland": "ireland.png",
-            "Italy": "italy.png",
-            "latvia": "latvia.png",
-            "liechtenstein": "liechtenstein.png",
-            "lithuania": "lithuania.png",
-            "luxembourg": "luxembourg.png",
-            "malta": "malta.png",
-            "moldova": "moldova.png",
-            "monaco": "monaco.png",
-            "montenegro": "montenegro.png",
-            "netherlands": "netherlands.png",
-            "north macedonia": "north macedonia.png",
-            "norway": "norway.png",
-            "poland": "poland.png",
-            "portugal": "portugal.png",
-            "romania": "romania.png",
-            "russia": "russia.png",
-            "san marino": "san marino.png",
-            "serbia": "serbia.png",
-            "slovakia": "slovakia.png",
-            "slovenia": "slovenia.png",
-            "spain": "spain.png",
-            "sweden": "sweden.png",
-            "switzerland": "switzerland.png",
-            "turkey": "turkey.png",
-            "ukraine": "ukraine.png",
-            "united kingdom": "united kingdom.png",
-            "vatican city": "vatican city.png",
-        }
-        self.american_countries  = {
-            "united states of america": "united states of america.png"
-        }
-        self.asian_countries = {}
-        self.oceanic_countries = {}
-        self.african_countries = {}
-        self.result = {}
-    def getResult(self):
-        if self.european_countries:
-            self.result.update(self.european_countries)
-        if self.american_countries:
-            self.result.update(self.american_countries)
-        if self.asian_countries:
-            self.result.update(self.asian_countries)
-        if self.oceanic_countries:
-            self.result.update(self.oceanic_countries)
-        if self.african_countries:
-            self.result.update(self.african_countries)
+import os
+import sqlite3
 
+class countries:
+    def __init__(self):
+        self.result = {}
+        self.create_database()
+        self.load_countries()
+
+    def create_database(self):
+        # Connect to the database (or create it if it doesn't exist)
+        with sqlite3.connect("flags.db") as conn:
+            cursor = conn.cursor()
+
+            # Create a table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS countries (
+                    country TEXT PRIMARY KEY,
+                    continent TEXT
+                )
+            ''')
+
+    def load_countries(self):
+        with sqlite3.connect("flags.db") as conn:
+            cursor = conn.cursor()
+
+            # Check if the database is empty
+            cursor.execute("SELECT COUNT(*) FROM countries")
+            if cursor.fetchone()[0] == 0:
+                # If the database is empty, populate it with data
+                self.populate_database(cursor)
+            else:
+                # Otherwise, load data from the database
+                cursor.execute("SELECT country, continent FROM countries")
+                self.result = dict(cursor.fetchall())
+
+    def populate_database(self, cursor):
+        # You should replace this with your actual data loading logic
+        # For demonstration purposes, I'm assuming a simplified structure
+        europe_countries = self.load_countries_data("data/flags/europe")
+        america_countries = self.load_countries_data("data/flags/america")
+        asia_countries = self.load_countries_data("data/flags/asia")
+        oceania_countries = self.load_countries_data("data/flags/oceania")
+        africa_countries = self.load_countries_data("data/flags/africa")
+
+        # Insert data into the database
+        cursor.executemany("INSERT INTO countries VALUES (?, ?)", europe_countries)
+        cursor.executemany("INSERT INTO countries VALUES (?, ?)", america_countries)
+        cursor.executemany("INSERT INTO countries VALUES (?, ?)", asia_countries)
+        cursor.executemany("INSERT INTO countries VALUES (?, ?)", oceania_countries)
+        cursor.executemany("INSERT INTO countries VALUES (?, ?)", africa_countries)
+
+        # Commit the changes
+        cursor.connection.commit()
+
+    def load_countries_data(self, folder):
+        countries_data = []
+        for filename in os.listdir(folder):
+            country_name = os.path.splitext(filename)[0].title()  # Extract country name from filename
+            countries_data.append((country_name, os.path.basename(os.path.normpath(folder))))
+        return countries_data
+    def getResult(self):
         return self.result
+    def connect_db():
+        return sqlite3.connect('flags.db')
