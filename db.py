@@ -26,7 +26,6 @@ def insert_score(db_filename, score, countries_list, wrong_countries):
         if len(mistakes)!=0 and len(mistakes)!=3:
             mistakes += ","
         mistakes += i
-        
     cursor.execute('''  INSERT INTO 
                         scores (score, timestamp, game_sequence, mistakes) 
                         VALUES (?, ?, ?, ?)''', (score, timestamp, countries, mistakes))

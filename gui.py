@@ -25,10 +25,8 @@ class gui:
     def load_flags(self, game_countries):
         result = game_countries.getResult()
         flags = {}
-
-        with countries.connect_db() as conn:
+        with game_countries.connect_db() as conn:
             cursor = conn.cursor()
-
             for country, continent in result.items():
                 flag_path = os.path.join("data/flags", continent, f"{country}.png")
                 flags[country] = pygame.transform.scale(pygame.image.load(flag_path), self.flag_size)

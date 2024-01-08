@@ -1,6 +1,7 @@
 from pygame import mixer
 import os
 import random
+
 def playMusic():
     song_files = [f for f in os.listdir("data/music") if f.endswith(".mp3")]
     if song_files:

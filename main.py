@@ -18,22 +18,21 @@ pygame.init()
 # Database setup
 db_filename = "scores.db"
 
+
 # Ensure the 'scores' table is created
 db.create_scores_table(db_filename)
 # Load and play a random song from the "data" folder
-AUDIO = True
-if(AUDIO):
-    audio.playMusic()
+
 #Game constants
 MAXLIVES = 3
 INITSCORE = 0
-
-
+AUDIO = False
+if(AUDIO):
+    audio.playMusic()
 # Game variables
 game_countries = countries.countries()
 current_country = random.choice(list(game_countries.getResult().keys()))
-countries_list = []
-wrong_countries = []
+countries_list, wrong_countries = [], []
 print(f"CURRENT GAME SEQUENCE: {current_country}", end=", ", flush=True)
 countries_list.append(current_country)
 score = INITSCORE
@@ -84,7 +83,11 @@ while running:
                 g.set_input_text(g.get_input_text() + event.unicode)
 
     # Display the current flag
-    scripts.showFlag(g.getScreen(), g.getFlags(), current_country, g.get_width(), g.getFlagSize(), g.get_height())
+    scripts.showFlag(g.getScreen(), 
+                     g.getFlags(), 
+                     current_country, 
+                     g.get_width(), g.get_height(),
+                     g.getFlagSize())
     # Display score and lives with increased vertical separation
     score_text = g.getFont().render(f"Score: {score}", True, (255, 255, 255))  # White color for score
     lives_text = g.getFont().render(f"Lives: {lives}", True, (255, 255, 255))
@@ -129,7 +132,6 @@ while running:
 
                 elif event.type == pygame.MOUSEBUTTONDOWN:
                     g.set_mouse_x_y(pygame.mouse.get_pos())
-
                     quit_button_rect = pygame.Rect(g.get_width() // 2 - 100, g.get_height() // 2 + 50, 100, 50)
                     back_button_rect = pygame.Rect(g.get_width() // 2 - 70, g.get_height() - 50, 140, 50)
 
