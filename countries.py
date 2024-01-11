@@ -2,7 +2,7 @@ import os
 import sqlite3
 
 class countries:
-    def __init__(self):
+    def __init__(self, gamemode):
         self.result = {}
         self.db_filename = "flags.db"
 
@@ -18,7 +18,7 @@ class countries:
             self.populate_database(cursor)
 
         # Load countries from the database
-        self.load_countries(self.db_filename)
+        self.load_countries(self.db_filename, gamemode)
 
     def create_database(self, db_filename):
         try:
@@ -41,7 +41,7 @@ class countries:
 
 
 
-    def load_countries(self, db_filename):
+    def load_countries(self, db_filename, gamemode):
         try:
             with sqlite3.connect(db_filename) as conn:
                 cursor = conn.cursor()
@@ -51,12 +51,38 @@ class countries:
                 if cursor.fetchone()[0] == 0:
                     # If the database is empty, populate it with data
                     self.populate_database(cursor)
-                    cursor.execute("SELECT country, continent FROM countries")
+                    if type(gamemode) == str:
+                        match gamemode:
+                            case "europe":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = europe")
+                            case "america":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = america")
+                            case "africa":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = africa")
+                            case "oceania":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = oceania")
+                            case _:
+                                cursor.execute("SELECT country, continent FROM countries")
+                    elif type(gamemode) == list:
+                        raise Exception("List passed as parameter for gamemode")
                     self.result = dict(cursor.fetchall())
                 else:
                     # Otherwise, load data from the database
-                    cursor.execute("SELECT country, continent FROM countries")
-                    self.result = dict(cursor.fetchall())
+                    if type(gamemode) == str:
+                        match gamemode:
+                            case "europe":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'europe'")
+                            case "america":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'america'")
+                            case "africa":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'africa'")
+                            case "oceania":
+                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'oceania'")
+                            case _:
+                                cursor.execute("SELECT country, continent FROM countries")
+                    elif type(gamemode) == list:
+                        raise Exception("List passed as parameter for gamemode")  
+                    self.result = dict(cursor.fetchall())                    
         except Exception:
             print("Error while loading countries")
             print(Exception)

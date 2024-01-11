@@ -58,7 +58,7 @@ class gui:
         self.screen.blit(mute_text, (mute_button_rect.centerx - mute_text.get_width() // 2, mute_button_rect.centery - mute_text.get_height() // 2))
 
         pygame.display.flip()
-    def showGameOver(self, score, wrong_countries):
+    def showGameOver(self, score, wrong_countries,gamemode):
         self.screen.fill((0, 0, 0))  # Black background
         game_over_text = self.font.render(f"Game Over - Score: {score}", True, (255, 0, 0))
         mistakes_text = self.font.render(f"Mistakes: {', '.join(wrong_countries)}", True, (255, 0, 0))
@@ -76,15 +76,15 @@ class gui:
         pygame.display.flip()
 
         pygame.time.delay(50)  # Add a delay to avoid flickering
-    def showRankings(self, db_filename):
+    def showRankings(self,db_filename, gamemode):
         self.screen.fill((0, 0, 0))  # Black background
-        rankings_text = self.font.render("Top 10 Rankings:", True, (255, 255, 255))  # White color for rankings text
+        rankings_text = self.font.render(f"Top 10 Rankings for gamemode {gamemode}:", True, (255, 255, 255))  # White color for rankings text
         self.screen.blit(rankings_text, (self.width // 2 - rankings_text.get_width() // 2, 50))
 
         # Fetch and display top 10 rankings from the database (ordered by score)
-        top_scores = db.get_top_scores(db_filename,limit=10)
+        top_scores = db.get_top_scores(db_filename, gamemode,limit=10)
 
-        for i, (rank, timestamp, game_sequence, mistakes) in enumerate(top_scores):
+        for i, (rank, timestamp, gamemode, game_sequence, mistakes,) in enumerate(top_scores):
             rank_text = self.font.render(f"{i + 1}. Score: {rank} - {timestamp} - {mistakes}", True, (255, 255, 255))
             self.screen.blit(rank_text, (self.width // 2 - rank_text.get_width() // 2, 100 + i * 30))
 

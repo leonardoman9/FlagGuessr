@@ -26,26 +26,30 @@ db.create_scores_table(db_filename)
 #Game constants
 MAXLIVES = 3
 INITSCORE = 0
-AUDIO = False
-if(AUDIO):
-    audio.playMusic()
+MUSIC = False
+
+#Start music
+audio.playMusic(MUSIC)
+
 # Game variables
-game_countries = countries.countries()
-current_country = random.choice(list(game_countries.getResult().keys()))
+gamemode = "oceania"
+game_countries = countries.countries(gamemode)
+current_country = random.choice(list
+                                (game_countries
+                                 .getResult()
+                                 .keys()))
 countries_list, wrong_countries = [], []
-print(f"CURRENT GAME SEQUENCE: {current_country}", end=", ", flush=True)
 countries_list.append(current_country)
 score = INITSCORE
 lives = MAXLIVES
 
-
 g = gui.gui(game_countries)
+print(f"CURRENT GAME SEQUENCE: {current_country}", end=", ", flush=True)
 
 # Game loop
 running = True
 game_over = False
 show_rankings = False
-print(current_country, end=", ", flush=True)
 
 while running:
     for event in pygame.event.get():
@@ -72,7 +76,7 @@ while running:
                     print(f"<-WRONG!", end=", ", flush = True)
                     if lives == 0:
                         # Game over if no lives left
-                        db.insert_score(db_filename, score, countries_list, wrong_countries)  # Save the score to the database
+                        db.insert_score(db_filename, score, countries_list, wrong_countries, gamemode)  # Save the score to the database
                         print(f"\n\nFull game: {countries_list}")
                         print(f"\nMistaken countries: {wrong_countries}")
                         game_over = True
@@ -119,7 +123,7 @@ while running:
                         show_rankings = True
                         wait = False
             # Display game over screen with Quit and Rankings buttons 
-            g.showGameOver(score,wrong_countries)
+            g.showGameOver(score,wrong_countries,gamemode)
             
 
     # Display rankings screen
@@ -141,7 +145,7 @@ while running:
                         show_rankings = False
 
             # Display rankings
-            g.showRankings(db_filename)
+            g.showRankings(db_filename, gamemode)
 
 # Quit Pygame
 pygame.quit()
