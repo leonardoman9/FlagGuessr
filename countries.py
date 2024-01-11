@@ -69,17 +69,7 @@ class countries:
                 else:
                     # Otherwise, load data from the database
                     if type(gamemode) == str:
-                        match gamemode:
-                            case "europe":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'europe'")
-                            case "america":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'america'")
-                            case "africa":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'africa'")
-                            case "oceania":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = 'oceania'")
-                            case _:
-                                cursor.execute("SELECT country, continent FROM countries")
+                        cursor.execute("SELECT country, continent FROM countries WHERE continent = ?", (gamemode,))
                     elif type(gamemode) == list:
                         raise Exception("List passed as parameter for gamemode")  
                     self.result = dict(cursor.fetchall())                    
