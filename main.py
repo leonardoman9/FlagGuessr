@@ -1,14 +1,11 @@
 import pygame
 import random
 import sys
-import os
-import sqlite3
-from datetime import datetime
-import countries
-import scripts
+
+from countries import countries
 import audio
 import db
-import gui
+from gui import gui
 
 # Initialize Pygame
 icon = pygame.image.load("data/icon.ico")
@@ -16,11 +13,11 @@ pygame.display.set_icon(icon)
 pygame.init()
 
 # Database setup
-db_filename = "scores.db"
-
+db_scores = "scores.db"
+db_flags = "flags.db"
 
 # Ensure the 'scores' table is created
-db.create_scores_table(db_filename)
+db.create_scores_table(db_scores)
 
 #Game constants
 MAXLIVES = 3
@@ -35,8 +32,10 @@ GAMEMODES = ["global",
 # Game variables
 score = INITSCORE
 lives = MAXLIVES
-music = True
-selected_gamemode = "asia"
+music = False
+selected_gamemode = 'europe'
+
+print(f"selected gamemode: {selected_gamemode}")
 
 # Game loop
 running = True
@@ -49,44 +48,53 @@ game_mode_selection = False
 #Start music
 audio.playMusic(music)
 
+# load the gui and countries classes
+g = gui() 
+countries = countries()
 
-try:
-    if selected_gamemode.lower() in GAMEMODES:
-        game_countries = countries.countries(selected_gamemode.lower())
-    else:
-        print("!!! Gamemode not valid !!! Quitting")
-        sys.exit()
-    current_country = random.choice(list
-                                (game_countries
-                                 .getResult()
-                                 .keys()))
-    countries_list, wrong_countries = [], []
-    countries_list.append(current_country)
-    
-except Exception as e:
-    print("Error while choosing gamemode:\n", e)
-g = gui.gui(game_countries)
-print(f"CURRENT GAME SEQUENCE: {current_country}", end=", ", flush=True)
-
-def setGameLoop(sc, r, g, go, sr, gms):
+def setGameLoop(set_splash_screen, set_running, 
+                set_game, set_gameover, 
+                set_show_rankings, set_game_mode_selection):
     global splash_screen, running, game, game_over, show_rankings, game_mode_selection
-    splash_screen = sc
-    running = r
-    game = g
-    game_over = go
-    show_rankings = sr
-    game_mode_selection = gms
+    splash_screen = set_splash_screen
+    running = set_running
+    game = set_game
+    game_over = set_gameover
+    show_rankings = set_show_rankings
+    game_mode_selection = set_game_mode_selection
 
 
 while running:
     if splash_screen and not show_rankings:
-        g.showSplashScreen()
+        g.showSplashScreen(GAMEMODES)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                     g.set_mouse_x_y(pygame.mouse.get_pos())
                     if g.play_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
+                        score = INITSCORE
+                        lives = MAXLIVES
+                        print(f"selected gamemode: {selected_gamemode}")
+                        g.set_input_text("")
+                        try:
+                            # Load countries from the database
+                            if selected_gamemode.lower() in GAMEMODES:
+                                game_countries = countries.load_countries(db_flags, selected_gamemode.lower())
+                                game_flags_images = countries.load_flags_images(game_countries,g.getFlagSize())
+                            else:
+                                print("!!! Gamemode not valid !!! Quitting")
+                                sys.exit()
+                            current_country = random.choice(list
+                                                        (game_countries
+                                                        .keys()))
+                            countries_list, wrong_countries = [], []
+                            countries_list.append(current_country)
+                            print(f"CURRENT GAME SEQUENCE: {current_country}", end=", ", flush=True)
+                            
+                        except Exception as e:
+                            print("Error while choosing gamemode:\n", e)
+                            sys.exit()
                         setGameLoop(False, True, True, False, False, False)
                     if g.splash_rankings_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
                         setGameLoop(False, True, False, False, False, True)
@@ -106,24 +114,34 @@ while running:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                     g.set_mouse_x_y(pygame.mouse.get_pos())
                     if g.rank_mode_global_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        top_scores = db.get_top_scores(db_filename, "global", limit=10)
+                        top_scores = db.get_top_scores(db_scores, "global", limit=10)
                         g.showRankingsFromMenu(top_scores, "global")
                         setGameLoop(False, True, False, False, True,False)
                     if g.rank_mode_europe_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        top_scores = db.get_top_scores(db_filename, "europe", limit=10)
+                        top_scores = db.get_top_scores(db_scores, "europe", limit=10)
                         g.showRankings(top_scores, "europe")
+                        setGameLoop(False, True, False, False, True,False)
+
                     if g.rank_mode_america_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        top_scores = db.get_top_scores(db_filename, "america", limit=10)
+                        top_scores = db.get_top_scores(db_scores, "america", limit=10)
                         g.showRankingsFromMenu(top_scores, "america")
+                        setGameLoop(False, True, False, False, True,False)
+
                     if g.rank_mode_asia_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        top_scores = db.get_top_scores(db_filename, "asia", limit=10)
+                        top_scores = db.get_top_scores(db_scores, "asia", limit=10)
                         g.showRankingsFromMenu(top_scores, "asia")
+                        setGameLoop(False, True, False, False, True,False)
+
                     if g.rank_mode_oceania_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        top_scores = db.get_top_scores(db_filename, "oceania", limit=10)
+                        top_scores = db.get_top_scores(db_scores, "oceania", limit=10)
                         g.showRankingsFromMenu(top_scores, "oceania")
+                        setGameLoop(False, True, False, False, True,False)
+
                     if g.rank_mode_africa_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        top_scores = db.get_top_scores(db_filename, "africa", limit=10)
+                        top_scores = db.get_top_scores(db_scores, "africa", limit=10)
                         g.showRankingsFromMenu(top_scores, "africa")
+                        setGameLoop(False, True, False, False, True,False)
+
                     if g.rank_mode_main_menu_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
                         setGameLoop(True, True, False, False, False, False)
                     while game_mode_selection:
@@ -133,11 +151,11 @@ while running:
                             elif event.type == pygame.MOUSEBUTTONDOWN:
                                 g.set_mouse_x_y(pygame.mouse.get_pos())
                                
-                                
-
-
     if game:
-        g.showGame(current_country, score, lives)
+        g.showGame(current_country, 
+                                    score, 
+                                    game_flags_images,
+                                    lives)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -151,7 +169,7 @@ while running:
                     if g.get_input_text().lower() == current_country.lower():
                         # Correct guess
                         score += 1
-                        current_country = random.choice(list(game_countries.getResult().keys()))
+                        current_country = random.choice(list(game_countries.keys()))
                         print(current_country, end=", ", flush=True)
                         countries_list.append(current_country)
                         g.set_input_text("")
@@ -162,7 +180,7 @@ while running:
                         print(f"<-WRONG!", end=", ", flush = True)
                         if lives == 0:
                             # Game over if no lives left
-                            db.insert_score(db_filename, score, countries_list, wrong_countries, selected_gamemode)  # Save the score to the database
+                            db.insert_score(db_scores, score, countries_list, wrong_countries, selected_gamemode)  # Save the score to the database
                             print(f"\n\nFull game: {countries_list}")
                             print(f"\nMistaken countries: {wrong_countries}")
                             game_over = True
@@ -191,7 +209,7 @@ while running:
 
     if show_rankings:
         # Display rankings
-        top_scores = db.get_top_scores(db_filename, selected_gamemode, limit=10)
+        top_scores = db.get_top_scores(db_scores, selected_gamemode, limit=10)
         g.showRankings(top_scores, selected_gamemode)
         #Events handling
         while show_rankings:
@@ -205,7 +223,3 @@ while running:
                     if g.rank_sel_main_menu_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
                         setGameLoop(True, True, False, False, False, False)
 
-
-# Quit Pygame
-pygame.quit()
-sys.exit()

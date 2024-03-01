@@ -35,7 +35,7 @@ def insert_score(db_filename, score, countries_list, wrong_countries, gamemode):
         cursor.execute('''  INSERT INTO 
                             scores (score, timestamp, gamemode ,game_sequence, mistakes) 
                             VALUES (?, ?, ?, ?, ?)''', (score, timestamp, gamemode, countries, mistakes))
-        print(f"Score inserted into {db_filename}")
+        print(f"Score inserted into {db_filename}") 
         connection.commit()
         connection.close()
     except Exception as e:

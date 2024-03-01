@@ -1,9 +1,9 @@
 import os
 import sqlite3
+import pygame
 
 class countries:
-    def __init__(self, gamemode):
-        self.result = {}
+    def __init__(self):
         self.db_filename = "flags.db"
 
         # Destroy the database if it exists
@@ -17,9 +17,7 @@ class countries:
             cursor = conn.cursor()
             self.populate_database(cursor)
 
-        # Load countries from the database
-        self.load_countries(self.db_filename, gamemode)
-
+       
     def create_database(self, db_filename):
         try:
         # Connect to the database (or create it if it doesn't exist)
@@ -52,27 +50,21 @@ class countries:
                     # If the database is empty, populate it with data
                     self.populate_database(cursor)
                     if type(gamemode) == str:
-                        match gamemode:
-                            case "europe":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = europe")
-                            case "america":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = america")
-                            case "africa":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = africa")
-                            case "oceania":
-                                cursor.execute("SELECT country, continent FROM countries WHERE continent = oceania")
-                            case _:
-                                cursor.execute("SELECT country, continent FROM countries")
+                        cursor.execute("SELECT country, continent FROM countries WHERE continent = ?", (gamemode,))
                     elif type(gamemode) == list:
                         raise Exception("List passed as parameter for gamemode")
                     self.result = dict(cursor.fetchall())
                 else:
                     # Otherwise, load data from the database
                     if type(gamemode) == str:
-                        cursor.execute("SELECT country, continent FROM countries WHERE continent = ?", (gamemode,))
+                        if gamemode == "global":
+                            cursor.execute("SELECT country, continent FROM countries")
+                        else:
+                            cursor.execute("SELECT country, continent FROM countries WHERE continent = ?", (gamemode,))
                     elif type(gamemode) == list:
                         raise Exception("List passed as parameter for gamemode")  
-                    self.result = dict(cursor.fetchall())                    
+                    self.result = dict(cursor.fetchall())    
+                    return self.result               
         except Exception:
             print("Error while loading countries")
             print(Exception)
@@ -120,9 +112,26 @@ class countries:
         except Exception:
             print("Error while loading countries data from database '{db_filename}'")
 
-
-    def getResult(self):
-        return self.result
-
     def connect_db(self):
         return sqlite3.connect(self.db_filename)
+
+    def load_flags_images(self, game_countries, flag_size):
+        flags = {}
+        flags_directory = "data/flags"  # Adjust the directory path as needed
+
+        for country, continent in game_countries.items():
+            # Assuming the country names are in lowercase in the flags directory
+            country_lowercase = country.lower()
+            flag_path = os.path.join(flags_directory, continent.lower(), f"{country_lowercase}.png")
+            
+            # Check if the file exists before adding to the dictionary
+            if os.path.isfile(flag_path):
+                # Load the image using pygame
+                flag_image = pygame.image.load(flag_path)
+                resized_flag = pygame.transform.scale(flag_image, flag_size)
+                flags[country] = resized_flag
+            else:
+                print(f"Flag not found for {country} in {flag_path}")
+
+        return flags
+     
