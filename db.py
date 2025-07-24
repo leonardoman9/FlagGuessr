@@ -1,112 +1,141 @@
 import sqlite3
-from datetime import datetime
-import json
+import os
+from scripts import resource_path
 
+# --- Database Initialization ---
 
-def create_scores_table(db_filename):
+def create_connection(db_file):
+    """Create a database connection to a SQLite database"""
+    conn = None
     try:
-        connection = sqlite3.connect(db_filename)
-        cursor = connection.cursor()
-        cursor.execute('''  CREATE TABLE IF NOT EXISTS scores
-                            (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            score INTEGER,
-                            timestamp TEXT,
-                            gamemode TEXT,
-                            game_sequence LONGTEXT,
-                            mistakes TEXT,
-                            game_mode TEXT DEFAULT 'normal',
-                            time_taken INTEGER DEFAULT 0,
-                            flags_shown INTEGER DEFAULT 0,
-                            mode_specific_data TEXT DEFAULT '{}')''')
-        connection.commit()
-        
-        # Check if we need to add new columns to existing table
-        cursor.execute("PRAGMA table_info(scores)")
-        columns = [column[1] for column in cursor.fetchall()]
-        
-        # Add missing columns for backward compatibility
-        if 'game_mode' not in columns:
-            cursor.execute('ALTER TABLE scores ADD COLUMN game_mode TEXT DEFAULT "normal"')
-            print("Added game_mode column")
-        
-        if 'time_taken' not in columns:
-            cursor.execute('ALTER TABLE scores ADD COLUMN time_taken INTEGER DEFAULT 0')
-            print("Added time_taken column")
-            
-        if 'flags_shown' not in columns:
-            cursor.execute('ALTER TABLE scores ADD COLUMN flags_shown INTEGER DEFAULT 0')
-            print("Added flags_shown column")
-            
-        if 'mode_specific_data' not in columns:
-            cursor.execute('ALTER TABLE scores ADD COLUMN mode_specific_data TEXT DEFAULT "{}"')
-            print("Added mode_specific_data column")
-        
-        connection.commit()
-        connection.close()
-        print(f"Successfully created/updated scores table in {db_filename}")
-    except Exception as e:
-        print(f"Error while creating/updating database {db_filename}: {e}")
+        conn = sqlite3.connect(db_file)
+    except sqlite3.Error as e:
+        print(f"Error connecting to database: {e}")
+    return conn
 
-def insert_score(db_filename, score, countries_list, wrong_countries, gamemode, 
-                game_mode="normal", time_taken=0, flags_shown=0, mode_data=None):
+def create_table(conn, create_table_sql):
+    """Create a table from the create_table_sql statement"""
     try:
-        connection = sqlite3.connect(db_filename)
-        cursor = connection.cursor()
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        countries = ""
-        for i in countries_list:
-            countries += i+ ", "
-        mistakes = ""
-        for i in wrong_countries:
-            if len(mistakes)!=0 and len(mistakes)!=3:
-                mistakes += ","
-            mistakes += i
-        
-        # Handle mode-specific data
-        if mode_data is None:
-            mode_data = {}
-        mode_data_json = json.dumps(mode_data)
-        
-        cursor.execute('''  INSERT INTO 
-                            scores (score, timestamp, gamemode, game_sequence, mistakes, 
-                                   game_mode, time_taken, flags_shown, mode_specific_data) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
-                       (score, timestamp, gamemode, countries, mistakes, 
-                        game_mode, time_taken, flags_shown, mode_data_json))
-        print(f"Score inserted into {db_filename} (mode: {game_mode})") 
-        connection.commit()
-        connection.close()
-    except Exception as e:
-        print(f"Error while inserting score in {db_filename}:\n {e}")
+        c = conn.cursor()
+        c.execute(create_table_sql)
+    except sqlite3.Error as e:
+        print(f"Error creating table: {e}")
 
-def get_top_scores(db_filename, gamemode, game_mode="all", limit=10):
-    try:
-        connection = sqlite3.connect(db_filename)
-        cursor = connection.cursor()
+# --- Scores Database Management ---
+
+def create_scores_table(db_path):
+    """Create the scores table if it doesn't exist."""
+    sql_create_scores_table = """ CREATE TABLE IF NOT EXISTS scores (
+                                        id integer PRIMARY KEY,
+                                        score integer NOT NULL,
+                                        timestamp text NOT NULL,
+                                        gamemode text NOT NULL,
+                                        game_sequence text,
+                                        mistakes text,
+                                        game_mode text,
+                                        time_taken real,
+                                        flags_shown integer,
+                                        mode_data text
+                                    ); """
+    conn = create_connection(db_path)
+    if conn:
+        create_table(conn, sql_create_scores_table)
+        print(f"Successfully created/updated scores table in {db_path}")
+        conn.close()
+
+def insert_score(db_path, score, game_sequence, wrong_countries, gamemode, game_mode, time_taken, flags_shown, mode_data):
+    """Insert a new score into the scores table."""
+    from datetime import datetime
+    import json
+    
+    conn = create_connection(db_path)
+    if conn:
+        sql = ''' INSERT INTO scores(score, timestamp, gamemode, game_sequence, mistakes, game_mode, time_taken, flags_shown, mode_data)
+                  VALUES(?,?,?,?,?,?,?,?,?) '''
+        cur = conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        sequence_str = ",".join(game_sequence)
+        mistakes_str = ",".join(wrong_countries)
+        mode_data_str = json.dumps(mode_data)
         
-        # Build query based on filters
-        base_query = '''SELECT score, timestamp, gamemode, game_sequence, mistakes,
-                              game_mode, time_taken, flags_shown, mode_specific_data 
-                        FROM scores WHERE gamemode = ?'''
+        cur.execute(sql, (score, now, gamemode, sequence_str, mistakes_str, game_mode, time_taken, flags_shown, mode_data_str))
+        conn.commit()
+        conn.close()
+
+def get_top_scores(db_path, gamemode, filter_mode="all", limit=10):
+    """Query top scores from the scores table based on gamemode and filter."""
+    conn = create_connection(db_path)
+    if not conn:
+        return []
+
+    try:
+        cur = conn.cursor()
+        # Base query
+        query = "SELECT score, timestamp, gamemode, game_sequence, mistakes, game_mode, time_taken, flags_shown, mode_data FROM scores WHERE gamemode = ?"
         params = [gamemode]
-        
-        if game_mode != "all":
-            base_query += ' AND game_mode = ?'
-            params.append(game_mode)
-        
-        # Order by score for most modes, but by time for blitz mode
-        if game_mode == "blitz":
-            base_query += ' ORDER BY score DESC, time_taken ASC LIMIT ?'
-        else:
-            base_query += ' ORDER BY score DESC LIMIT ?'
-        
+
+        # Apply filter for specific game modes (normal, endless, blitz)
+        if filter_mode != "all":
+            query += " AND game_mode = ?"
+            params.append(filter_mode)
+
+        # Order by score and select top N
+        query += " ORDER BY score DESC, timestamp DESC LIMIT ?"
         params.append(limit)
         
-        cursor.execute(base_query, params)
-        top_scores = cursor.fetchall()
-        connection.close()
-        print(f"Top scores loaded from {db_filename} for gamemode '{gamemode}' mode '{game_mode}': {len(top_scores)} records found")
-        return top_scores
-    except Exception as e:
-        print(f"Error while retrieving top scores from {db_filename} for gamemode '{gamemode}' mode '{game_mode}':\n {e}")
-        return []  # Return empty list instead of None
+        cur.execute(query, tuple(params))
+        rows = cur.fetchall()
+        return rows
+    except sqlite3.Error as e:
+        print(f"Database error in get_top_scores: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+# --- Flags Database Management ---
+
+def populate_flags_database(db_path):
+    """
+    Populates the flags database from the data folder.
+    This should only be run if the database is missing or needs an update.
+    """
+    conn = create_connection(db_path)
+    if not conn:
+        return
+
+    sql_create_flags_table = """CREATE TABLE IF NOT EXISTS flags (
+                                id INTEGER PRIMARY KEY,
+                                country TEXT NOT NULL UNIQUE,
+                                continent TEXT NOT NULL
+                            );"""
+    create_table(conn, sql_create_flags_table)
+
+    # Check if table is already populated
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) from flags")
+    if cursor.fetchone()[0] > 0:
+        print("Flags database is already populated.")
+        conn.close()
+        return
+
+    print("Populating flags database...")
+    base_flags_path = resource_path("data/flags")
+    continents = ['africa', 'america', 'asia', 'europe', 'oceania']
+    
+    for continent in continents:
+        continent_path = os.path.join(base_flags_path, continent)
+        try:
+            for filename in os.listdir(continent_path):
+                if filename.endswith(".png"):
+                    country_name = os.path.splitext(filename)[0]
+                    sql = '''INSERT INTO flags(country, continent) VALUES(?,?)'''
+                    cursor.execute(sql, (country_name, continent))
+        except FileNotFoundError:
+            print(f"Warning: Directory not found for continent: {continent}")
+            continue
+            
+    conn.commit()
+    conn.close()
+    print("Flags database populated successfully.")

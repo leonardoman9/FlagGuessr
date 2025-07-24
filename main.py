@@ -1,373 +1,252 @@
 import pygame
 import random
 import sys
+import os
 
 from countries import countries
 import audio
 import db
 from gui import gui
+from scripts import resource_path, get_user_data_path
 
 # Initialize Pygame
-icon = pygame.image.load("data/icon.ico")
+icon = pygame.image.load(resource_path("data/icon.ico"))
 pygame.display.set_icon(icon)
 pygame.init()
 
 # Database setup
-db_scores = "scores.db"
-db_flags = "flags.db"
+db_scores = get_user_data_path("scores.db")
+db_flags = get_user_data_path("flags.db")
 
 # Ensure the 'scores' table is created
 db.create_scores_table(db_scores)
+# Populate the flags database if it's empty
+db.populate_flags_database(db_flags)
 
-#Game constants
+# Game constants
 MAXLIVES = 3
 INITSCORE = 0
-GAMEMODES = ["global",
-             "europe",
-             "oceania",
-             "africa",
-             "asia",
-             "america"]
+GAMEMODES = ["global", "europe", "oceania", "africa", "asia", "america"]
 
 # Game variables
 score = INITSCORE
 lives = MAXLIVES
 wrong_countries = []
+selected_game_mode = "normal"
+selected_map = "europe"
+flags_shown_count = 0
+game_start_time = 0
+blitz_time_limit = 60
+
+# --- State Management ---
+current_state = "splash"
+previous_screen_for_rankings = None  # Remembers where we came from to rankings
+
+def change_state(new_state):
+    """Changes the current game state."""
+    global current_state
+    print(f"Changing state from '{current_state}' to '{new_state}'")
+    current_state = new_state
 
 # Initialize audio mixer
 if not audio.init_mixer():
     print("Warning: Audio mixer failed to initialize. Music will not work.")
 
-# Game loop
-running = True
-splash_screen = True
-game = False
-game_over = False
-show_rankings = False
-
-mode_selection = False  # New state for selecting game mode (Normal/Endless/Blitz)
-came_from_game_over = False  # Track where we came from to rankings
-
-# Game mode variables
-selected_game_mode = "normal"  # normal, endless, blitz
-selected_map = "europe"  # default map selection
-
-# Game mode specific tracking
-flags_shown_count = 0  # for endless mode
-game_start_time = 0  # for blitz mode
-blitz_time_limit = 60  # 60 seconds for blitz mode
-
 # Start with random music
 audio.playMusic(random_song=True)
 
-# load the gui and countries classes
-g = gui() 
+# Load the GUI and countries classes
+g = gui()
 countries = countries()
 
-def setGameLoop(set_splash_screen, set_running, 
-                set_game, set_gameover, 
-                set_show_rankings, set_mode_selection=False):
-    global splash_screen, running, game, game_over, show_rankings, mode_selection
-    splash_screen = set_splash_screen
-    running = set_running
-    game = set_game
-    game_over = set_gameover
-    show_rankings = set_show_rankings
-    mode_selection = set_mode_selection
-
-
+# Main game loop
+running = True
 while running:
-    if splash_screen and not show_rankings:
+    if current_state == "splash":
         g.showSplashScreen()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                    mouse_pos = pygame.mouse.get_pos()
-                    g.set_mouse_x_y(mouse_pos)
-                    
-                    # Handle music controls first
-                    if g.handle_music_controls_click(mouse_pos):
-                        continue  # Skip other button checks if music control was clicked
-                    
+                mouse_pos = pygame.mouse.get_pos()
+                g.set_mouse_x_y(mouse_pos)
+                if g.handle_music_controls_click(mouse_pos):
+                    continue
+                if g.play_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
+                    change_state("mode_selection")
+                if g.splash_rankings_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
+                    previous_screen_for_rankings = "splash"
+                    change_state("rankings_map_selection")
+                if g.splash_quit_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
+                    running = False
 
-                    
-                    if g.play_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        # Go to mode selection screen instead of starting game directly
-                        setGameLoop(False, True, False, False, False, True)
-                    if g.splash_rankings_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        came_from_game_over = False  # Coming from main menu
-                        setGameLoop(False, True, False, False, True, False)
-                    if g.splash_quit_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                        setGameLoop(False, False, False, False, False)
-
-    if splash_screen and show_rankings:
-        pass
-
-    if mode_selection:
+    elif current_state == "mode_selection":
         g.showModeSelection(GAMEMODES)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                setGameLoop(False, False, False, False, False, False, False)
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+                running = False
+            if event.type in [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION, pygame.MOUSEWHEEL]:
                 mouse_pos = pygame.mouse.get_pos()
                 g.set_mouse_x_y(mouse_pos)
-                
-                # Handle mode selection clicks
-                mode_result = g.handle_mode_selection_click(mouse_pos)
+                mode_result = g.handle_mode_selection_click(event, mouse_pos)
                 if mode_result:
                     if mode_result == "back":
-                        # Go back to main menu
-                        setGameLoop(True, True, False, False, False, False)
+                        change_state("splash")
                     else:
-                        # Start game with selected mode and map
                         selected_game_mode, selected_map = mode_result
-                        print(f"Selected mode: {selected_game_mode}, map: {selected_map}")
-                        
-                        # Initialize game with selected parameters
+                        # Reset and initialize game variables
                         score = INITSCORE
                         lives = MAXLIVES
                         wrong_countries = []
-                        flags_shown_count = 0  # Reset flag counter
+                        flags_shown_count = 0
                         g.set_input_text("")
                         g.clear_error_message()
-                        
-                        # Set game start time for blitz mode
                         if selected_game_mode == "blitz":
                             game_start_time = pygame.time.get_ticks()
                         
-                        try:
-                            # Load countries from the database
-                            if selected_map.lower() in GAMEMODES:
-                                game_countries = countries.load_countries(db_flags, selected_map.lower())
-                                game_flags_images = countries.load_flags_images(game_countries, g.getFlagSize())
-                            else:
-                                print("!!! Map not valid !!! Quitting")
-                                sys.exit()
-                            
-                            current_country = random.choice(list(game_countries.keys()))
-                            
-                            # Initialize countries_list based on game mode
-                            if selected_game_mode == "normal":
-                                # For normal mode, track all countries to complete
-                                countries_list = []
-                                countries_list.append(current_country)
-                            else:
-                                # For endless/blitz, just track shown flags for stats
-                                countries_list = []  # Keep for compatibility, but don't use for completion
-                                countries_list.append(current_country)
-                                flags_shown_count = 1  # Start counting
-                            
-                            print(f"CURRENT GAME SEQUENCE ({selected_game_mode.upper()}): {current_country}", end=", ", flush=True)
-                            
-                        except Exception as e:
-                            print("Error while choosing gamemode:\n", e)
-                            sys.exit()
+                        game_countries = countries.load_countries(db_flags, selected_map.lower())
+                        game_flags_images = countries.load_flags_images(game_countries, g.getFlagSize())
+                        current_country = random.choice(list(game_countries.keys()))
+                        countries_list = [current_country]
+                        if selected_game_mode != "normal":
+                            flags_shown_count = 1
                         
-                        # Start the game
-                        setGameLoop(False, True, True, False, False, False)
+                        change_state("game")
 
-
-    if game:
-        # Check blitz mode timer outside of input events
+    elif current_state == "game":
         if selected_game_mode == "blitz" and game_start_time > 0:
             elapsed_time = (pygame.time.get_ticks() - game_start_time) / 1000
             if elapsed_time >= blitz_time_limit:
-                # Time's up! End game automatically
-                print(f"\nTIME'S UP! Final score: {score}")
-                mode_data = {"time_taken": blitz_time_limit}
-                db.insert_score(db_scores, score, countries_list, wrong_countries, 
-                               selected_map, selected_game_mode, blitz_time_limit, flags_shown_count, mode_data)
-                print(f"\nGame mode: {selected_game_mode}, Flags shown: {flags_shown_count}")
-                game_over = True
-                game = False
+                db.insert_score(db_scores, score, countries_list, wrong_countries, selected_map, selected_game_mode, blitz_time_limit, flags_shown_count, {})
+                change_state("game_over")
         
-        g.showGame(current_country, 
-                                    score, 
-                                    game_flags_images,
-                                    lives,
-                                    selected_game_mode,
-                                    game_start_time,
-                                    blitz_time_limit,
-                                    flags_shown_count)
+        g.showGame(current_country, score, game_flags_images, lives, selected_game_mode, game_start_time, blitz_time_limit, flags_shown_count)
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
                 g.set_mouse_x_y(mouse_pos)
-                
-                # Handle EXIT button click
                 if g.get_game_exit_button_rect().collidepoint(mouse_pos):
-                    # Return to main menu
-                    setGameLoop(True, True, False, False, False)
+                    change_state("splash")
                     continue
-                
-                # Handle music controls during game
                 g.handle_game_music_click(mouse_pos)
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-
-                elif event.key == pygame.K_RETURN:
-                    # Check for blitz mode timeout
-                    if selected_game_mode == "blitz":
-                        elapsed_time = (pygame.time.get_ticks() - game_start_time) / 1000
-                        if elapsed_time >= blitz_time_limit:
-                            # Time's up! End game
-                            print(f"\nTIME'S UP! Final score: {score}")
-                            selected_gamemode = selected_map
-                            mode_data = {"time_taken": blitz_time_limit}
-                            db.insert_score(db_scores, score, countries_list, wrong_countries, 
-                                           selected_map, selected_game_mode, blitz_time_limit, flags_shown_count, mode_data)
-                            print(f"\nGame mode: {selected_game_mode}, Flags shown: {flags_shown_count}")
-                            game_over = True
-                            game = False
-                            continue
-                    
-                    # Check the user's input
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
                     if g.get_input_text().lower() == current_country.lower():
-                        # Correct guess
                         score += 1
-                        g.clear_error_message()  # Clear any error message
-                        
-                        # Choose next country based on game mode
+                        g.clear_error_message()
                         if selected_game_mode == "normal":
-                            # Normal mode: remove from available countries (no repeats)
                             available_countries = [c for c in game_countries.keys() if c not in countries_list]
                             if available_countries:
                                 current_country = random.choice(available_countries)
                                 countries_list.append(current_country)
                             else:
-                                # Completed all countries! Victory!
-                                print(f"\nCOMPLETED! All {len(countries_list)} countries guessed!")
-                                selected_gamemode = selected_map
-                                mode_data = {"completion": True}
-                                db.insert_score(db_scores, score, countries_list, wrong_countries, 
-                                               selected_map, selected_game_mode, 0, len(countries_list), mode_data)
-                                print(f"\nGame mode: {selected_game_mode}")
-                                game_over = True
-                                game = False
-                                continue
+                                db.insert_score(db_scores, score, countries_list, wrong_countries, selected_map, selected_game_mode, 0, len(countries_list), {"completion": True})
+                                change_state("victory")
                         else:
-                            # Endless/Blitz mode: infinite random selection
                             current_country = random.choice(list(game_countries.keys()))
                             countries_list.append(current_country)
                             flags_shown_count += 1
-                        
-                        print(current_country, end=", ", flush=True)
                         g.set_input_text("")
                     else:
-                        # Incorrect guess - immediately continue to next country with error message
                         lives -= 1
                         wrong_countries.append(current_country)
-                        user_answer = g.get_input_text()
-                        print(f"<-WRONG! It was {current_country}", end=", ", flush=True)
-                        
-                        # Show error message overlay for next country
                         g.show_error_message(f"Wrong! It was: {current_country}")
-                        
-                        # Check if game over
                         if lives <= 0:
-                            selected_gamemode = selected_map
-                            # Calculate mode-specific data
-                            mode_data = {}
                             time_taken = 0
-                            
-                            if selected_game_mode == "endless":
-                                mode_data["flags_shown"] = flags_shown_count
-                            elif selected_game_mode == "blitz":
+                            if selected_game_mode == "blitz":
                                 time_taken = int((pygame.time.get_ticks() - game_start_time) / 1000)
-                                mode_data["time_taken"] = time_taken
-                            
-                            db.insert_score(db_scores, score, countries_list, wrong_countries, 
-                                           selected_map, selected_game_mode, time_taken, flags_shown_count, mode_data)
-                            print(f"\n\nFull game: {countries_list}")
-                            print(f"\nMistaken countries: {wrong_countries}")
-                            print(f"\nGame mode: {selected_game_mode}")
-                            if selected_game_mode == "endless":
-                                print(f"Flags shown: {flags_shown_count}")
-                            elif selected_game_mode == "blitz":
-                                print(f"Time taken: {time_taken}s")
-                            game_over = True
-                            game = False
+                            db.insert_score(db_scores, score, countries_list, wrong_countries, selected_map, selected_game_mode, time_taken, flags_shown_count, {})
+                            change_state("game_over")
                         else:
-                            # Continue to next country immediately
                             if selected_game_mode == "normal":
-                                # Normal mode: choose from remaining countries
                                 available_countries = [c for c in game_countries.keys() if c not in countries_list]
                                 if available_countries:
                                     current_country = random.choice(available_countries)
                                     countries_list.append(current_country)
-                                else:
-                                    # This shouldn't happen, but fallback to any country
-                                    current_country = random.choice(list(game_countries.keys()))
-                                    countries_list.append(current_country)
+                                else: # Should not happen if lives > 0
+                                    change_state("victory")
                             else:
-                                # Endless/Blitz mode: infinite random
                                 current_country = random.choice(list(game_countries.keys()))
                                 countries_list.append(current_country)
                                 flags_shown_count += 1
-                            
-                            print(current_country, end=", ", flush=True)
-                        
-                        g.set_input_text("")  # Clear input for next round
-
+                        g.set_input_text("")
                 elif event.key == pygame.K_BACKSPACE:
                     g.set_input_text(g.get_input_text()[:-1])
                 else:
                     g.set_input_text(g.get_input_text() + event.unicode)
 
-    if game_over:
-        # Display game over screen with Quit and Rankings buttons 
-        selected_gamemode = g.get_selected_gamemode()
-        g.showGameOver(score,wrong_countries,selected_gamemode)
-        #Events Handling
-        while game_over:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    setGameLoop(False, False, False, False, False, False)
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    g.set_mouse_x_y(pygame.mouse.get_pos())
-                    if g.get_quit_button_rect().collidepoint(g.get_x_y()):
-                        setGameLoop(False, False, False, False, False)
-                    elif g.get_rankings_button_rect().collidepoint(g.get_x_y()):
-                        came_from_game_over = True  # Coming from game over
-                        setGameLoop(False, True, False, False, True)
-                    elif g.main_menu_button_rect.collidepoint(g.get_x_y()):
-                        setGameLoop(True, True, False, False, False)
-
-    if show_rankings:
-        # Display rankings
-        rankings_gamemode = g.get_rankings_gamemode()
-        # Use the selected filter for database query
-        rankings_filter = g.selected_rankings_filter
-        top_scores = db.get_top_scores(db_scores, rankings_gamemode, rankings_filter, limit=10)
-        # Handle case when db.get_top_scores returns None due to error
-        if top_scores is None:
-            top_scores = []
-        g.showRankings(top_scores, rankings_gamemode)
-        #Events handling
+    elif current_state == "game_over":
+        g.showGameOver(score, wrong_countries, selected_map)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                setGameLoop(False, False, False, False, False)
+                running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
+                g.set_mouse_x_y(pygame.mouse.get_pos())
+                if g.get_quit_button_rect().collidepoint(g.get_x_y()):
+                    running = False
+                elif g.get_rankings_button_rect().collidepoint(g.get_x_y()):
+                    previous_screen_for_rankings = "game_over"
+                    g.set_rankings_gamemode(selected_map)
+                    change_state("rankings")
+                elif g.main_menu_button_rect.collidepoint(g.get_x_y()):
+                    change_state("splash")
+
+    elif current_state == "victory":
+        g.showVictory(score, selected_map)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                g.set_mouse_x_y(pygame.mouse.get_pos())
+                if g.get_quit_button_rect().collidepoint(g.get_x_y()):
+                    running = False
+                elif g.get_rankings_button_rect().collidepoint(g.get_x_y()):
+                    previous_screen_for_rankings = "victory"
+                    g.set_rankings_gamemode(selected_map)
+                    change_state("rankings")
+                elif g.main_menu_button_rect.collidepoint(g.get_x_y()):
+                    change_state("splash")
+
+    elif current_state == "rankings":
+        rankings_gamemode = g.get_rankings_gamemode()
+        rankings_filter = g.selected_rankings_filter
+        top_scores = db.get_top_scores(db_scores, rankings_gamemode, rankings_filter, limit=10)
+        g.showRankings(top_scores, rankings_gamemode)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type in [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP, pygame.MOUSEMOTION, pygame.MOUSEWHEEL]:
                 mouse_pos = pygame.mouse.get_pos()
                 g.set_mouse_x_y(mouse_pos)
-                
-                # Handle filter tab clicks
-                if g.handle_ranking_filter_click(mouse_pos):
-                    # The filter has been updated, rankings will refresh on next frame
-                    continue  # Skip other button checks
-                
-                if g.rankings_back_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                    if came_from_game_over:
-                        # Return to game over screen
-                        setGameLoop(False, True, False, True, False)
+                if g.handle_scroll(event, mouse_pos):
+                    continue
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if g.handle_ranking_filter_click(mouse_pos):
+                        continue
+                    if g.rankings_back_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
+                        if previous_screen_for_rankings == "victory":
+                            change_state("victory")
+                        elif previous_screen_for_rankings == "game_over":
+                            change_state("game_over")
+                        else:
+                            change_state("rankings_map_selection")
+                    if g.rank_sel_main_menu_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
+                        change_state("splash")
+
+    elif current_state == "rankings_map_selection":
+        g.showModeSelectionScreen()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                result = g.handle_rankings_mode_click(mouse_pos)
+                if result:
+                    if result == "back":
+                        change_state("splash")
                     else:
-                        # Return to main menu (no more mode selection screen from rankings)
-                        setGameLoop(True, True, False, False, False)
-                if g.rank_sel_main_menu_button_rect.collidepoint(g.get_mouse_x(), g.get_mouse_y()):
-                    setGameLoop(True, True, False, False, False)
+                        change_state("rankings")
 

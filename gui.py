@@ -4,6 +4,7 @@ import math
 from countries import countries
 import db
 import scripts
+from scripts import resource_path
 
 class gui:
     def __init__(self):
@@ -97,11 +98,11 @@ class gui:
         # Typography hierarchy
         try:
             self.fonts = {
-                'title': pygame.font.Font("./data/fonts/americancaptain.ttf", 48),      # Big titles
-                'heading': pygame.font.Font("./data/fonts/americancaptain.ttf", 36),    # Section headings
-                'body': pygame.font.Font("./data/fonts/americancaptain.ttf", 24),       # Body text
-                'small': pygame.font.Font("./data/fonts/americancaptain.ttf", 18),      # Small text
-                'caption': pygame.font.Font("./data/fonts/americancaptain.ttf", 14),    # Captions
+                'title': pygame.font.Font(resource_path("./data/fonts/americancaptain.ttf"), 48),      # Big titles
+                'heading': pygame.font.Font(resource_path("./data/fonts/americancaptain.ttf"), 36),    # Section headings
+                'body': pygame.font.Font(resource_path("./data/fonts/americancaptain.ttf"), 24),       # Body text
+                'small': pygame.font.Font(resource_path("./data/fonts/americancaptain.ttf"), 18),      # Small text
+                'caption': pygame.font.Font(resource_path("./data/fonts/americancaptain.ttf"), 14),    # Captions
             }
         except:
             # Fallback to system font if custom font fails
@@ -145,6 +146,22 @@ class gui:
         # Rankings filter variables
         self.selected_rankings_filter = "all"  # all, normal, endless, blitz
         
+        # Rankings scroll variables
+        self.scroll_y = 0
+        self.max_scroll_y = 0
+        self.scroll_bar_rect = None
+        self.scroll_handle_rect = None
+        self.is_scrolling = False
+        
+        # Mode selection map dropdown state
+        self.mode_map_dropdown_open = False
+        self.mode_map_scroll_y = 0
+        self.mode_map_option_height = 40
+        self.mode_map_visible_options = 3 # Show 3 items at a time to prevent overlap
+        self.mode_map_is_scrolling = False
+        self.mode_map_scroll_offset_y = 0
+        self.mode_map_option_rects = []
+
         # Modern layout using grid system
         center_x = self.width // 2
         center_y = self.height // 2
@@ -246,18 +263,12 @@ class gui:
         self.mode_endless_button_rect = pygame.Rect(mode_start_x + mode_card_width + mode_spacing, mode_y, mode_card_width, mode_card_height)
         self.mode_blitz_button_rect = pygame.Rect(mode_start_x + (mode_card_width + mode_spacing) * 2, mode_y, mode_card_width, mode_card_height)
         
-        # Map selector - moved to top right corner as compact buttons
-        map_button_width = 120
-        map_button_height = 35
-        map_start_x = self.width - 150
-        map_start_y = 80
-        
-        self.map_global_rect = pygame.Rect(map_start_x, map_start_y, map_button_width, map_button_height)
-        self.map_europe_rect = pygame.Rect(map_start_x, map_start_y + 40, map_button_width, map_button_height)
-        self.map_asia_rect = pygame.Rect(map_start_x, map_start_y + 80, map_button_width, map_button_height)
-        self.map_america_rect = pygame.Rect(map_start_x, map_start_y + 120, map_button_width, map_button_height)
-        self.map_africa_rect = pygame.Rect(map_start_x, map_start_y + 160, map_button_width, map_button_height)
-        self.map_oceania_rect = pygame.Rect(map_start_x, map_start_y + 200, map_button_width, map_button_height)
+        # Map selector - NEW dropdown design
+        map_dropdown_width = 240
+        map_dropdown_height = 50
+        map_dropdown_x = self.width - map_dropdown_width - 40 # Top-right corner with margin
+        map_dropdown_y = 80
+        self.mode_map_dropdown_rect = pygame.Rect(map_dropdown_x, map_dropdown_y, map_dropdown_width, map_dropdown_height)
         
         # Mode selection navigation
         self.mode_back_button_rect = pygame.Rect(center_x - 100, self.height - 100, 200, 50)
@@ -721,7 +732,7 @@ class gui:
             now_playing_text = "♪ No music playing"
             
         # Draw now playing text
-        small_font = pygame.font.Font("./data/fonts/americancaptain.ttf", 18)
+        small_font = pygame.font.Font(resource_path("./data/fonts/americancaptain.ttf"), 18)
         playing_surface = small_font.render(now_playing_text, True, (200, 200, 255))
         self.screen.blit(playing_surface, (self.music_dropdown_rect.x, self.music_dropdown_rect.y + 35))
 
@@ -729,7 +740,7 @@ class gui:
         """Draw a smaller button for music controls"""
         pygame.draw.rect(self.screen, color, rect)
         pygame.draw.rect(self.screen, (255, 255, 255), rect, 1)  # White border
-        small_font = pygame.font.Font("./data/fonts/americancaptain.ttf", 18)
+        small_font = pygame.font.Font(resource_path("./data/fonts/americancaptain.ttf"), 18)
         text_surface = small_font.render(text, True, (0, 0, 0))
         self.screen.blit(text_surface, (rect.centerx - text_surface.get_width() // 2, rect.centery - text_surface.get_height() // 2))
 
@@ -1316,11 +1327,10 @@ class gui:
             pygame.draw.line(self.screen, (r, g, b), (0, y), (self.width, y))
     
     def draw_modern_dropdown(self, rect, selected_text, options, dropdown_open=None):
-        """Draw a modern dropdown with the new design system"""
+        """Draw a modern dropdown with the new design system - BOX ONLY"""
         mouse_pos = pygame.mouse.get_pos()
         hover = rect.collidepoint(mouse_pos)
         
-        # Use provided dropdown_open state or default to self.dropdown_open
         is_open = dropdown_open if dropdown_open is not None else self.dropdown_open
         
         # Background and border
@@ -1337,55 +1347,16 @@ class gui:
         
         if is_open:
             # Up arrow
-            pygame.draw.polygon(self.screen, arrow_color, [
-                (arrow_x, arrow_y + 5),
-                (arrow_x + 10, arrow_y + 5),
-                (arrow_x + 5, arrow_y - 5)
-            ])
+            pygame.draw.polygon(self.screen, arrow_color, [(arrow_x, arrow_y + 5), (arrow_x + 10, arrow_y + 5), (arrow_x + 5, arrow_y - 5)])
         else:
             # Down arrow
-            pygame.draw.polygon(self.screen, arrow_color, [
-                (arrow_x, arrow_y - 5),
-                (arrow_x + 10, arrow_y - 5),
-                (arrow_x + 5, arrow_y + 5)
-            ])
+            pygame.draw.polygon(self.screen, arrow_color, [(arrow_x, arrow_y - 5), (arrow_x + 10, arrow_y - 5), (arrow_x + 5, arrow_y + 5)])
 
         # Selected text
         text_surface = self.fonts['body'].render(selected_text, True, self.colors['text_primary'])
         text_rect = text_surface.get_rect(centery=rect.centery, x=rect.x + 15)
         self.screen.blit(text_surface, text_rect)
 
-        # Draw dropdown options if open
-        if is_open:
-            option_height = 35
-            for i, option in enumerate(options):
-                option_rect = pygame.Rect(rect.x, rect.y + rect.height + (i * option_height), rect.width, option_height)
-                option_hover = option_rect.collidepoint(mouse_pos)
-                
-                # For mode selection dropdown, use selected_mode_map instead of selected_gamemode
-                selected_value = getattr(self, 'selected_mode_map', getattr(self, 'selected_gamemode', ''))
-                
-                # Highlight selected and hovered options
-                if option.lower() == selected_value.lower():
-                    option_bg = self.colors['primary']
-                    option_text_color = self.colors['text_primary']
-                elif option_hover:
-                    option_bg = self.colors['bg_card']
-                    option_text_color = self.colors['text_primary']
-                else:
-                    option_bg = self.colors['bg_surface']
-                    option_text_color = self.colors['text_secondary']
-                    
-                pygame.draw.rect(self.screen, option_bg, option_rect)
-                pygame.draw.rect(self.screen, self.colors['border'], option_rect, 1)
-                
-                option_text = self.fonts['body'].render(option.upper(), True, option_text_color)
-                option_text_rect = option_text.get_rect(centery=option_rect.centery, x=option_rect.x + 15)
-                self.screen.blit(option_text, option_text_rect)
-                
-                # Store for click detection
-                setattr(self, f"dropdown_option_{i}_rect", option_rect)
-   
     def showGameOver(self, score, wrong_countries, gamemode):
         # Modern gradient background
         self.screen.fill(self.colors['bg_main'])
@@ -1500,6 +1471,66 @@ class gui:
 
         pygame.display.flip()
         pygame.time.delay(50)
+
+    def showVictory(self, score, gamemode):
+        # Modern gradient background
+        self.screen.fill(self.colors['bg_main'])
+        self.draw_gradient_background()
+
+        # Victory main title
+        victory_title = self.fonts['title'].render("CONGRATULATIONS!", True, self.colors['success'])
+        title_rect = victory_title.get_rect(center=(self.width // 2, 150))
+        self.screen.blit(victory_title, title_rect)
+
+        # Score display with modern card
+        score_card_rect = pygame.Rect(self.width // 2 - 200, 220, 400, 100)
+        
+        # Card shadow
+        shadow_rect = pygame.Rect(score_card_rect.x + 4, score_card_rect.y + 4, score_card_rect.width, score_card_rect.height)
+        shadow_surface = pygame.Surface((score_card_rect.width, score_card_rect.height))
+        shadow_surface.set_alpha(40)
+        shadow_surface.fill((0, 0, 0))
+        self.screen.blit(shadow_surface, shadow_rect)
+        
+        # Main score card
+        pygame.draw.rect(self.screen, self.colors['bg_surface'], score_card_rect)
+        pygame.draw.rect(self.screen, self.colors['secondary'], score_card_rect, 3)
+
+        # Score content
+        final_score_label = self.fonts['small'].render("FINAL SCORE", True, self.colors['text_secondary'])
+        final_score_value = self.fonts['title'].render(str(score), True, self.colors['secondary'])
+        gamemode_label = self.fonts['small'].render(f"Mode: {gamemode.upper()}", True, self.colors['text_muted'])
+        
+        label_rect = final_score_label.get_rect(center=(self.width // 2, 240))
+        value_rect = final_score_value.get_rect(center=(self.width // 2, 270))
+        mode_rect = gamemode_label.get_rect(center=(self.width // 2, 300))
+        
+        self.screen.blit(final_score_label, label_rect)
+        self.screen.blit(final_score_value, value_rect)
+        self.screen.blit(gamemode_label, mode_rect)
+
+        # Action buttons with hover effects
+        mouse_pos = pygame.mouse.get_pos()
+        
+        main_menu_hover = self.main_menu_button_rect.collidepoint(mouse_pos)
+        rankings_hover = self.rankings_button_rect.collidepoint(mouse_pos)
+        quit_hover = self.quit_button_rect.collidepoint(mouse_pos)
+        
+        self.draw_modern_button(self.main_menu_button_rect, "MAIN MENU", 'primary', main_menu_hover)
+        self.draw_modern_button(self.rankings_button_rect, "SEE RANKINGS", 'secondary', rankings_hover)
+        self.draw_modern_button(self.quit_button_rect, "QUIT", 'error', quit_hover)
+
+        # Motivational message
+        message = "🏆 Excellent! You're a geography master!"
+        color = self.colors['success']
+        
+        message_text = self.fonts['small'].render(message, True, color)
+        message_rect = message_text.get_rect(center=(self.width // 2, self.height - 100))
+        self.screen.blit(message_text, message_rect)
+
+        pygame.display.flip()
+        pygame.time.delay(50)
+
     def showModeSelectionScreen(self):
         # Modern gradient background
         self.screen.fill(self.colors['bg_main'])
@@ -1583,7 +1614,7 @@ class gui:
         self.draw_gradient_background()
         
         # Modern title section
-        title_text = self.fonts['heading'].render(f"TOP 10 RANKINGS", True, self.colors['text_primary'])
+        title_text = self.fonts['heading'].render(f"TOP RANKINGS", True, self.colors['text_primary'])
         subtitle_text = self.fonts['body'].render(f"{gamemode.upper()} MODE", True, self.colors['secondary'])
         
         title_rect = title_text.get_rect(center=(self.width // 2, 80))
@@ -1596,82 +1627,73 @@ class gui:
         mouse_pos = pygame.mouse.get_pos()
         self.draw_ranking_filter_tabs(mouse_pos)
         
-        # Rankings content area (adjusted for tabs with more spacing for 1920x1080)
-        content_start_y = 280  # More space between tabs and content
+        # Rankings content area
+        content_start_y = 280
+        content_height = self.height - content_start_y - 100 # Room for nav buttons
+        content_rect = pygame.Rect(self.width // 2 - 500, content_start_y, 1000, content_height)
         
-        if scores and len(scores) > 0:
-            # Mode-specific headers
-            self.draw_mode_specific_headers(content_start_y)
-            
-            # Display rankings with modern card styling
+        # Create a surface for scrollable content
+        scroll_surface = pygame.Surface((content_rect.width, content_rect.height), pygame.SRCALPHA)
+
+        # Calculate total height of all rankings to determine max scroll
+        row_height = 45
+        header_height = 40
+        total_content_height = len(scores) * row_height + header_height
+        self.max_scroll_y = max(0, total_content_height - content_height)
+
+        # Clamp scroll_y to valid range
+        self.scroll_y = max(0, min(self.scroll_y, self.max_scroll_y))
+        
+        # Draw headers on the scroll surface
+        self.draw_mode_specific_headers(0, scroll_surface)
+        
+        if scores:
+            # Display rankings
             for i, row in enumerate(scores):
-                # Handle both old and new database format
-                if len(row) >= 9:  # New format with game mode
-                    score, timestamp, gamemode_db, game_sequence, mistakes, game_mode, time_taken, flags_shown, mode_data = row
-                else:  # Old format
-                    score, timestamp, gamemode_db, game_sequence, mistakes = row
-                    game_mode = "normal"  # Default for old records
-                    time_taken = 0
-                    flags_shown = 0
+                y_pos = header_height + (i * row_height)
                 
-                y_pos = content_start_y + 40 + (i * 45)  # +40 for header space
+                row_surface = pygame.Surface((content_rect.width, row_height), pygame.SRCALPHA)
+                card_rect = pygame.Rect(0, 0, content_rect.width, 40)
                 
-                # Ranking card background
-                card_rect = pygame.Rect(self.width // 2 - 500, y_pos, 1000, 40)
-                
-                # Highlight top 3 with special colors
-                if i == 0:  # Gold for 1st place
-                    card_color = (*self.colors['secondary'], 20)  # Semi-transparent
+                if i == 0:  # Gold
                     border_color = self.colors['secondary']
-                elif i == 1:  # Silver for 2nd place
-                    card_color = (*self.colors['text_secondary'], 20)
+                elif i == 1:  # Silver
                     border_color = self.colors['text_secondary']
-                elif i == 2:  # Bronze for 3rd place
-                    card_color = (*self.colors['warning'], 20)
+                elif i == 2:  # Bronze
                     border_color = self.colors['warning']
                 else:
-                    card_color = self.colors['bg_surface']
                     border_color = self.colors['border']
-                
-                # Draw card with shadow for top 3
-                if i < 3:
-                    shadow_rect = pygame.Rect(card_rect.x + 2, card_rect.y + 2, card_rect.width, card_rect.height)
-                    shadow_surface = pygame.Surface((card_rect.width, card_rect.height))
-                    shadow_surface.set_alpha(30)
-                    shadow_surface.fill((0, 0, 0))
-                    self.screen.blit(shadow_surface, shadow_rect)
-                
-                pygame.draw.rect(self.screen, card_color if i >= 3 else self.colors['bg_surface'], card_rect)
-                pygame.draw.rect(self.screen, border_color, card_rect, 2 if i < 3 else 1)
-                
-                # Rank number with special styling for top 3
-                rank_font = self.fonts['heading'] if i < 3 else self.fonts['body']
-                rank_color = border_color if i < 3 else self.colors['text_primary']
-                
-                rank_text = rank_font.render(f"#{i + 1}", True, rank_color)
-                score_text = self.fonts['body'].render(str(score), True, self.colors['text_primary'])
-                
-                # Mode-specific data display
-                self.draw_mode_specific_data(card_rect, game_mode, score, time_taken, flags_shown, timestamp, mistakes, i + 1)
-                
+
+                pygame.draw.rect(row_surface, self.colors['bg_surface'], card_rect)
+                pygame.draw.rect(row_surface, border_color, card_rect, 2 if i < 3 else 1)
+
+                self.draw_mode_specific_data(card_rect, row, i + 1, row_surface)
+                scroll_surface.blit(row_surface, (0, y_pos))
         else:
-            # Empty state with nice styling
-            empty_card = pygame.Rect(self.width // 2 - 250, content_start_y + 100, 500, 100)
-            pygame.draw.rect(self.screen, self.colors['bg_surface'], empty_card)
-            pygame.draw.rect(self.screen, self.colors['border'], empty_card, 2)
+            # Empty state
+            empty_card = pygame.Rect(content_rect.width // 2 - 250, 100, 500, 100)
+            pygame.draw.rect(scroll_surface, self.colors['bg_surface'], empty_card)
+            pygame.draw.rect(scroll_surface, self.colors['border'], empty_card, 2)
             
             filter_name = self.selected_rankings_filter.upper()
             no_scores_icon = self.fonts['heading'].render("🏆", True, self.colors['text_muted'])
             no_scores_text = self.fonts['body'].render(f"No {filter_name} games in {gamemode.upper()} yet!", True, self.colors['text_secondary'])
             play_suggestion = self.fonts['small'].render("Start playing to see your scores here!", True, self.colors['text_muted'])
             
-            icon_rect = no_scores_icon.get_rect(center=(self.width // 2, content_start_y + 125))
-            text_rect = no_scores_text.get_rect(center=(self.width // 2, content_start_y + 155))
-            suggestion_rect = play_suggestion.get_rect(center=(self.width // 2, content_start_y + 175))
+            icon_rect = no_scores_icon.get_rect(center=(empty_card.centerx, empty_card.y - 75))
+            text_rect = no_scores_text.get_rect(center=(empty_card.centerx, empty_card.y - 45))
+            suggestion_rect = play_suggestion.get_rect(center=(empty_card.centerx, empty_card.y - 25))
             
-            self.screen.blit(no_scores_icon, icon_rect)
-            self.screen.blit(no_scores_text, text_rect)
-            self.screen.blit(play_suggestion, suggestion_rect)
+            scroll_surface.blit(no_scores_icon, icon_rect)
+            scroll_surface.blit(no_scores_text, text_rect)
+            scroll_surface.blit(play_suggestion, suggestion_rect)
+
+        # Blit the visible part of the scroll surface to the screen
+        self.screen.blit(scroll_surface, content_rect.topleft, (0, self.scroll_y, content_rect.width, content_height))
+
+        # Draw scrollbar if needed
+        if self.max_scroll_y > 0:
+            self.draw_scrollbar(content_rect, content_height)
         
         # Modern navigation buttons
         back_hover = self.rankings_back_button_rect.collidepoint(mouse_pos)
@@ -1683,135 +1705,94 @@ class gui:
         pygame.display.flip()
         pygame.time.delay(50)
     
-    def draw_mode_specific_headers(self, content_start_y):
-        """Draw headers based on selected ranking filter"""
-        header_rect = pygame.Rect(self.width // 2 - 500, content_start_y - 30, 1000, 25)
-        pygame.draw.rect(self.screen, self.colors['bg_surface'], header_rect)
-        pygame.draw.rect(self.screen, self.colors['border'], header_rect, 1)
+    def draw_mode_specific_headers(self, y_offset, surface):
+        """Draw headers based on selected ranking filter on a given surface."""
+        header_rect = pygame.Rect(0, y_offset, 1000, 30)
         
         # Common headers
         rank_header = self.fonts['small'].render("RANK", True, self.colors['text_secondary'])
         score_header = self.fonts['small'].render("SCORE", True, self.colors['text_secondary'])
         
-        self.screen.blit(rank_header, (self.width // 2 - 480, content_start_y - 25))
-        self.screen.blit(score_header, (self.width // 2 - 400, content_start_y - 25))
+        surface.blit(rank_header, (30, y_offset + 5))
+        surface.blit(score_header, (120, y_offset + 5))
         
         # Mode-specific headers
+        col3, col4, col5 = 250, 400, 550
+
         if self.selected_rankings_filter == "blitz":
-            time_header = self.fonts['small'].render("TIME", True, self.colors['text_secondary'])
-            rate_header = self.fonts['small'].render("FLAGS/SEC", True, self.colors['text_secondary'])
-            date_header = self.fonts['small'].render("DATE", True, self.colors['text_secondary'])
-            
-            self.screen.blit(time_header, (self.width // 2 - 300, content_start_y - 25))
-            self.screen.blit(rate_header, (self.width // 2 - 180, content_start_y - 25))
-            self.screen.blit(date_header, (self.width // 2 - 50, content_start_y - 25))
-            
+            headers = ["TIME", "FLAGS/SEC", "DATE"]
         elif self.selected_rankings_filter == "endless":
-            flags_header = self.fonts['small'].render("FLAGS", True, self.colors['text_secondary'])
-            rate_header = self.fonts['small'].render("AVG/LIFE", True, self.colors['text_secondary'])
-            date_header = self.fonts['small'].render("DATE", True, self.colors['text_secondary'])
-            
-            self.screen.blit(flags_header, (self.width // 2 - 300, content_start_y - 25))
-            self.screen.blit(rate_header, (self.width // 2 - 180, content_start_y - 25))
-            self.screen.blit(date_header, (self.width // 2 - 50, content_start_y - 25))
-            
+            headers = ["FLAGS", "AVG/LIFE", "DATE"]
         elif self.selected_rankings_filter == "normal":
-            completion_header = self.fonts['small'].render("COMPLETION", True, self.colors['text_secondary'])
-            accuracy_header = self.fonts['small'].render("ACCURACY", True, self.colors['text_secondary'])
-            date_header = self.fonts['small'].render("DATE", True, self.colors['text_secondary'])
-            
-            self.screen.blit(completion_header, (self.width // 2 - 300, content_start_y - 25))
-            self.screen.blit(accuracy_header, (self.width // 2 - 180, content_start_y - 25))
-            self.screen.blit(date_header, (self.width // 2 - 50, content_start_y - 25))
-            
+            headers = ["COMPLETION", "ACCURACY", "DATE"]
         else:  # "all" filter
-            mode_header = self.fonts['small'].render("MODE", True, self.colors['text_secondary'])
-            stat_header = self.fonts['small'].render("STAT", True, self.colors['text_secondary'])
-            date_header = self.fonts['small'].render("DATE", True, self.colors['text_secondary'])
-            
-            self.screen.blit(mode_header, (self.width // 2 - 300, content_start_y - 25))
-            self.screen.blit(stat_header, (self.width // 2 - 180, content_start_y - 25))
-            self.screen.blit(date_header, (self.width // 2 - 50, content_start_y - 25))
+            headers = ["MODE", "STAT", "DATE"]
+        
+        surface.blit(self.fonts['small'].render(headers[0], True, self.colors['text_secondary']), (col3, y_offset + 5))
+        surface.blit(self.fonts['small'].render(headers[1], True, self.colors['text_secondary']), (col4, y_offset + 5))
+        surface.blit(self.fonts['small'].render(headers[2], True, self.colors['text_secondary']), (col5, y_offset + 5))
     
-    def draw_mode_specific_data(self, card_rect, game_mode, score, time_taken, flags_shown, timestamp, mistakes, rank):
-        """Draw mode-specific data in ranking rows"""
-        text_y = card_rect.y + 12
+    def draw_mode_specific_data(self, card_rect, row, rank, surface):
+        """Draw mode-specific data in ranking rows on a given surface."""
+        if len(row) >= 9:
+            score, timestamp, _, _, mistakes, game_mode, time_taken, flags_shown, _ = row
+        else:
+            score, timestamp, _, _, mistakes = row
+            game_mode, time_taken, flags_shown = "normal", 0, 0
+
+        text_y = card_rect.centery
         
         # Common data
         rank_text = self.fonts['body'].render(f"#{rank}", True, self.colors['text_primary'])
         score_text = self.fonts['body'].render(str(score), True, self.colors['text_primary'])
         
-        self.screen.blit(rank_text, (self.width // 2 - 480, text_y))
-        self.screen.blit(score_text, (self.width // 2 - 400, text_y))
+        surface.blit(rank_text, rank_text.get_rect(centery=text_y, x=30))
+        surface.blit(score_text, score_text.get_rect(centery=text_y, x=120))
         
         # Format date
         try:
             from datetime import datetime
             date_obj = datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S')
-            formatted_date = date_obj.strftime('%d/%m')
+            formatted_date = date_obj.strftime('%d/%m/%y')
         except:
-            formatted_date = timestamp[:5]
+            formatted_date = "N/A"
         
         date_text = self.fonts['small'].render(formatted_date, True, self.colors['text_secondary'])
         
         # Mode-specific data
+        col3, col4, col5 = 250, 400, 550
+        
         if self.selected_rankings_filter == "blitz":
-            time_display = f"{time_taken}s" if time_taken > 0 else "N/A"
-            flags_per_sec = f"{score/max(time_taken, 1):.1f}" if time_taken > 0 else "N/A"
-            
-            time_text = self.fonts['small'].render(time_display, True, self.colors['text_secondary'])
-            rate_text = self.fonts['small'].render(flags_per_sec, True, self.colors['secondary'])
-            
-            self.screen.blit(time_text, (self.width // 2 - 300, text_y))
-            self.screen.blit(rate_text, (self.width // 2 - 180, text_y))
-            self.screen.blit(date_text, (self.width // 2 - 50, text_y))
-            
+            data1 = f"{time_taken}s" if time_taken > 0 else "N/A"
+            data2 = f"{score/max(time_taken, 1):.1f}" if time_taken > 0 else "N/A"
         elif self.selected_rankings_filter == "endless":
-            flags_display = str(flags_shown) if flags_shown > 0 else "N/A"
-            avg_per_life = f"{flags_shown/3:.1f}" if flags_shown > 0 else "N/A"
-            
-            flags_text = self.fonts['small'].render(flags_display, True, self.colors['text_secondary'])
-            avg_text = self.fonts['small'].render(avg_per_life, True, self.colors['secondary'])
-            
-            self.screen.blit(flags_text, (self.width // 2 - 300, text_y))
-            self.screen.blit(avg_text, (self.width // 2 - 180, text_y))
-            self.screen.blit(date_text, (self.width // 2 - 50, text_y))
-            
+            data1 = str(flags_shown) if flags_shown > 0 else "N/A"
+            data2 = f"{flags_shown/3:.1f}" if flags_shown > 0 else "N/A"
         elif self.selected_rankings_filter == "normal":
-            # Calculate completion and accuracy for normal mode
-            total_mistakes = len(mistakes.split(',')) if mistakes else 0
+            total_mistakes = len(mistakes.split(',')) if mistakes and mistakes.strip() else 0
             total_attempted = score + total_mistakes
-            completion = f"{score}/{total_attempted}" if total_attempted > 0 else "N/A"
-            accuracy = f"{(score/total_attempted*100):.0f}%" if total_attempted > 0 else "N/A"
-            
-            completion_text = self.fonts['small'].render(completion, True, self.colors['text_secondary'])
-            accuracy_text = self.fonts['small'].render(accuracy, True, self.colors['secondary'])
-            
-            self.screen.blit(completion_text, (self.width // 2 - 300, text_y))
-            self.screen.blit(accuracy_text, (self.width // 2 - 180, text_y))
-            self.screen.blit(date_text, (self.width // 2 - 50, text_y))
-            
+            data1 = f"{score}/{total_attempted}" if total_attempted > 0 else "N/A"
+            data2 = f"{(score/max(total_attempted, 1)*100):.0f}%"
         else:  # "all" filter
-            # Show mode icon and a relevant stat
             mode_icons = {"normal": "🎯", "endless": "♾️", "blitz": "⚡"}
             mode_icon = mode_icons.get(game_mode, "🎮")
-            mode_display = f"{mode_icon} {game_mode.upper()}"
+            data1 = f"{mode_icon} {game_mode.upper() if game_mode else 'N/A'}"
             
             if game_mode == "blitz":
-                stat_display = f"{score/max(time_taken, 1):.1f}/s" if time_taken > 0 else "N/A"
+                data2 = f"{score/max(time_taken, 1):.1f}/s" if time_taken > 0 else "N/A"
             elif game_mode == "endless":
-                stat_display = f"{flags_shown} flags" if flags_shown > 0 else "N/A"
-            else:  # normal
-                total_mistakes = len(mistakes.split(',')) if mistakes else 0
+                data2 = f"{flags_shown} flags" if flags_shown > 0 else "N/A"
+            else:
+                total_mistakes = len(mistakes.split(',')) if mistakes and mistakes.strip() else 0
                 total_attempted = score + total_mistakes
-                stat_display = f"{(score/total_attempted*100):.0f}%" if total_attempted > 0 else "N/A"
-            
-            mode_text = self.fonts['small'].render(mode_display, True, self.colors['text_secondary'])
-            stat_text = self.fonts['small'].render(stat_display, True, self.colors['secondary'])
-            
-            self.screen.blit(mode_text, (self.width // 2 - 300, text_y))
-            self.screen.blit(stat_text, (self.width // 2 - 180, text_y))
-            self.screen.blit(date_text, (self.width // 2 - 50, text_y))
+                data2 = f"{(score/max(total_attempted, 1)*100):.0f}%"
+
+        data1_text = self.fonts['small'].render(data1, True, self.colors['text_secondary'])
+        data2_text = self.fonts['small'].render(data2, True, self.colors['secondary'])
+
+        surface.blit(data1_text, data1_text.get_rect(centery=text_y, x=col3))
+        surface.blit(data2_text, data2_text.get_rect(centery=text_y, x=col4))
+        surface.blit(date_text, date_text.get_rect(centery=text_y, x=col5))
 
     def getWidthHeight(self):
         return self.width, self.height
@@ -1948,33 +1929,14 @@ class gui:
         title_rect = title_text.get_rect(center=(self.width // 2, 120))
         self.screen.blit(title_text, title_rect)
         
-        # Map selection section - new button-based design
+        # Map selection section - new dropdown design
         map_label = self.fonts['body'].render("Map:", True, self.colors['text_secondary'])
-        map_label_rect = map_label.get_rect(center=(self.width - 150, 50))
+        map_label_rect = map_label.get_rect(topleft=(self.mode_map_dropdown_rect.x, self.mode_map_dropdown_rect.y - 30))
         self.screen.blit(map_label, map_label_rect)
         
-        # Map buttons (replace dropdown with clean buttons)
-        mouse_pos = pygame.mouse.get_pos()
-        maps = [
-            {"name": "GLOBAL", "rect": self.map_global_rect, "id": "global"},
-            {"name": "EUROPE", "rect": self.map_europe_rect, "id": "europe"},
-            {"name": "ASIA", "rect": self.map_asia_rect, "id": "asia"},
-            {"name": "AMERICA", "rect": self.map_america_rect, "id": "america"},
-            {"name": "AFRICA", "rect": self.map_africa_rect, "id": "africa"},
-            {"name": "OCEANIA", "rect": self.map_oceania_rect, "id": "oceania"}
-        ]
-        
-        for map_item in maps:
-            rect = map_item["rect"]
-            hover = rect.collidepoint(mouse_pos)
-            selected = map_item["id"] == self.selected_mode_map
-            
-            # Button styling
-            if selected:
-                self.draw_modern_button(rect, map_item["name"], 'primary', hover)
-            else:
-                self.draw_modern_button(rect, map_item["name"], 'secondary', hover)
-        
+        # Draw the new scrollable dropdown for map selection
+        self.draw_map_dropdown(gamemodes)
+
         # Mode cards - enhanced modern design
         modes = [
             {
@@ -2006,6 +1968,7 @@ class gui:
             }
         ]
         
+        mouse_pos = pygame.mouse.get_pos()
         # Draw enhanced mode cards
         for mode in modes:
             rect = mode['rect']
@@ -2062,41 +2025,149 @@ class gui:
         self.draw_modern_button(self.mode_back_button_rect, "BACK TO MENU", 'secondary', back_hover)
         
         pygame.display.flip()
-    
-    def handle_mode_selection_click(self, mouse_pos):
-        """Handle clicks on the mode selection screen"""
-        # Check mode card clicks
-        if self.mode_normal_button_rect.collidepoint(mouse_pos):
-            self.selected_mode = "normal"
-            return ("normal", self.selected_mode_map)
-        elif self.mode_endless_button_rect.collidepoint(mouse_pos):
-            self.selected_mode = "endless"
-            return ("endless", self.selected_mode_map)
-        elif self.mode_blitz_button_rect.collidepoint(mouse_pos):
-            self.selected_mode = "blitz"
-            return ("blitz", self.selected_mode_map)
-        
-        # Check map button clicks (replace dropdown system)
-        map_buttons = [
-            (self.map_global_rect, "global"),
-            (self.map_europe_rect, "europe"),
-            (self.map_asia_rect, "asia"),
-            (self.map_america_rect, "america"),
-            (self.map_africa_rect, "africa"),
-            (self.map_oceania_rect, "oceania")
-        ]
-        
-        for rect, map_id in map_buttons:
-            if rect.collidepoint(mouse_pos):
-                self.selected_mode_map = map_id
-                return None
-        
-        # Check back button
-        if self.mode_back_button_rect.collidepoint(mouse_pos):
-            return "back"
-        
 
-        
+    def draw_map_dropdown(self, gamemodes):
+        """Draws the map selection dropdown menu in the mode selection screen."""
+        # Draw the main dropdown box
+        self.draw_modern_dropdown(self.mode_map_dropdown_rect, self.selected_mode_map.upper(), gamemodes, self.mode_map_dropdown_open)
+
+        if self.mode_map_dropdown_open:
+            options = ["GLOBAL", "EUROPE", "ASIA", "AMERICA", "AFRICA", "OCEANIA"]
+            
+            # Dropdown panel
+            panel_height = self.mode_map_option_height * self.mode_map_visible_options
+            panel_rect = pygame.Rect(self.mode_map_dropdown_rect.x, self.mode_map_dropdown_rect.bottom + 2, self.mode_map_dropdown_rect.width, panel_height)
+            
+            # Create a surface for scrollable options
+            options_surface = pygame.Surface((panel_rect.width, panel_height), pygame.SRCALPHA)
+            options_surface.fill((*self.colors['bg_surface'], 240)) # Semi-transparent background
+
+            # Total content height and scroll limits
+            total_content_height = len(options) * self.mode_map_option_height
+            max_scroll = max(0, total_content_height - panel_height)
+            self.mode_map_scroll_y = min(self.mode_map_scroll_y, max_scroll)
+
+            # Draw options
+            self.mode_map_option_rects = []
+            for i, option in enumerate(options):
+                option_y = (i * self.mode_map_option_height) - self.mode_map_scroll_y
+                # Only draw visible options
+                if option_y + self.mode_map_option_height > 0 and option_y < panel_height:
+                    option_rect_local = pygame.Rect(0, option_y, panel_rect.width, self.mode_map_option_height)
+                    
+                    # Store global rect for click detection
+                    option_rect_global = pygame.Rect(panel_rect.x, panel_rect.y + option_y, panel_rect.width, self.mode_map_option_height)
+                    self.mode_map_option_rects.append({'text': option, 'rect': option_rect_global})
+
+                    # Styling
+                    mouse_pos = pygame.mouse.get_pos()
+                    hover = option_rect_global.collidepoint(mouse_pos)
+                    selected = option.lower() == self.selected_mode_map.lower()
+
+                    if selected:
+                        bg_color = self.colors['primary']
+                    elif hover:
+                        bg_color = self.colors['bg_card']
+                    else:
+                        bg_color = self.colors['bg_surface']
+                    
+                    pygame.draw.rect(options_surface, bg_color, option_rect_local)
+                    pygame.draw.rect(options_surface, self.colors['border'], option_rect_local, 1)
+
+                    text_surf = self.fonts['body'].render(option, True, self.colors['text_primary'])
+                    text_rect = text_surf.get_rect(centery=option_rect_local.centery, x=15)
+                    options_surface.blit(text_surf, text_rect)
+            
+            # Blit the options surface and draw border
+            self.screen.blit(options_surface, panel_rect.topleft)
+            pygame.draw.rect(self.screen, self.colors['border'], panel_rect, 2)
+
+            # Draw scrollbar
+            if total_content_height > panel_height:
+                # Scrollbar track
+                scrollbar_rect = pygame.Rect(panel_rect.right - 15, panel_rect.y, 15, panel_rect.height)
+                pygame.draw.rect(self.screen, self.colors['bg_main'], scrollbar_rect)
+
+                # Handle
+                handle_height = max(20, (panel_height / total_content_height) * panel_height)
+                scroll_ratio = self.mode_map_scroll_y / max_scroll
+                handle_y = scrollbar_rect.y + scroll_ratio * (scrollbar_rect.height - handle_height)
+                self.mode_map_scroll_handle_rect = pygame.Rect(scrollbar_rect.x, handle_y, 15, handle_height)
+                
+                pygame.draw.rect(self.screen, self.colors['primary'], self.mode_map_scroll_handle_rect)
+
+    
+    def handle_mode_selection_click(self, event, mouse_pos):
+        """Handle clicks and scrolls on mode selection screen."""
+        # Handle dropdown scroll events first
+        if self.mode_map_dropdown_open:
+            # Mouse wheel
+            if event.type == pygame.MOUSEWHEEL:
+                self.mode_map_scroll_y -= event.y * 20
+                self.mode_map_scroll_y = max(0, self.mode_map_scroll_y) # Clamp top
+                return None # Consume event
+
+            # Scrollbar drag
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.mode_map_scroll_handle_rect and self.mode_map_scroll_handle_rect.collidepoint(mouse_pos):
+                    self.mode_map_is_scrolling = True
+                    self.mode_map_scroll_offset_y = mouse_pos[1] - self.mode_map_scroll_handle_rect.y
+                    return None
+            
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                self.mode_map_is_scrolling = False
+
+            if event.type == pygame.MOUSEMOTION and self.mode_map_is_scrolling:
+                total_h = len(["GLOBAL", "EUROPE", "ASIA", "AMERICA", "AFRICA", "OCEANIA"]) * self.mode_map_option_height
+                panel_h = self.mode_map_option_height * self.mode_map_visible_options
+                max_scroll = max(0, total_h - panel_h)
+                
+                track_h = (self.mode_map_dropdown_rect.height * self.mode_map_visible_options) - self.mode_map_scroll_handle_rect.height
+                
+                new_y = mouse_pos[1] - self.mode_map_scroll_offset_y
+                handle_base_y = self.mode_map_dropdown_rect.bottom + 2
+                new_y = max(handle_base_y, min(new_y, handle_base_y + track_h))
+                
+                scroll_ratio = (new_y - handle_base_y) / track_h
+                self.mode_map_scroll_y = scroll_ratio * max_scroll
+                return None
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Handle dropdown open/close
+            if self.mode_map_dropdown_rect.collidepoint(mouse_pos):
+                self.mode_map_dropdown_open = not self.mode_map_dropdown_open
+                return None
+            
+            # Handle option selection
+            if self.mode_map_dropdown_open:
+                for option in self.mode_map_option_rects:
+                    if option['rect'].collidepoint(mouse_pos):
+                        self.selected_mode_map = option['text'].lower()
+                        self.mode_map_dropdown_open = False
+                        return None # Consume click
+                
+                # If clicking outside dropdown when open, close it
+                panel_height = self.mode_map_option_height * self.mode_map_visible_options
+                panel_rect = pygame.Rect(self.mode_map_dropdown_rect.x, self.mode_map_dropdown_rect.bottom + 2, self.mode_map_dropdown_rect.width, panel_height)
+                if not panel_rect.collidepoint(mouse_pos):
+                    self.mode_map_dropdown_open = False
+                return None
+
+            # Handle mode selection cards
+            modes = [
+                (self.mode_normal_button_rect, "normal"),
+                (self.mode_endless_button_rect, "endless"),
+                (self.mode_blitz_button_rect, "blitz")
+            ]
+            for rect, mode_id in modes:
+                if rect.collidepoint(mouse_pos):
+                    self.selected_mode = mode_id
+                    return self.selected_mode, self.selected_mode_map
+            
+            # Handle back button
+            if self.mode_back_button_rect.collidepoint(mouse_pos):
+                return "back"
+
         return None
     
     def draw_ranking_filter_tabs(self, mouse_pos):
@@ -2171,4 +2242,82 @@ class gui:
             self.selected_rankings_filter = "blitz"
             return True
         return False
+    
+    def handle_rankings_mode_click(self, mouse_pos):
+        """Handle clicks on the rankings mode selection screen."""
+        mode_buttons = {
+            "global": self.rank_mode_global_button_rect,
+            "europe": self.rank_mode_europe_button_rect,
+            "america": self.rank_mode_america_button_rect,
+            "asia": self.rank_mode_asia_button_rect,
+            "oceania": self.rank_mode_oceania_button_rect,
+            "africa": self.rank_mode_africa_button_rect,
+        }
+
+        for mode, rect in mode_buttons.items():
+            if rect.collidepoint(mouse_pos):
+                self.set_rankings_gamemode(mode)
+                return mode
+
+        if self.rank_mode_main_menu_button_rect.collidepoint(mouse_pos):
+            return "back"
+
+        return None
+
+    def handle_scroll(self, event, mouse_pos):
+        """Handle mouse scrolling for the rankings list."""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 1 and self.scroll_bar_rect and self.scroll_handle_rect:
+                if self.scroll_handle_rect.collidepoint(mouse_pos):
+                    self.is_scrolling = True
+                    self.scroll_offset_y = mouse_pos[1] - self.scroll_handle_rect.y
+                    return True
+        
+        if event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:
+                self.is_scrolling = False
+                return True
+
+        if event.type == pygame.MOUSEMOTION:
+            if self.is_scrolling:
+                # Move scroll handle
+                new_y = mouse_pos[1] - self.scroll_offset_y
+                self.scroll_handle_rect.y = max(self.scroll_bar_rect.y, min(new_y, self.scroll_bar_rect.bottom - self.scroll_handle_rect.height))
+                
+                # Update scroll_y based on handle position
+                scroll_ratio = (self.scroll_handle_rect.y - self.scroll_bar_rect.y) / (self.scroll_bar_rect.height - self.scroll_handle_rect.height)
+                self.scroll_y = scroll_ratio * self.max_scroll_y
+                return True
+
+        # Mouse wheel scrolling
+        if event.type == pygame.MOUSEWHEEL:
+            self.scroll_y -= event.y * 20  # Adjust scroll speed
+            self.scroll_y = max(0, min(self.scroll_y, self.max_scroll_y))
+            return True
+
+        return False
+
+    def draw_scrollbar(self, content_rect, view_height):
+        """Draw a custom scrollbar for the rankings list."""
+        # Scrollbar track
+        bar_width = 15
+        self.scroll_bar_rect = pygame.Rect(content_rect.right + 10, content_rect.y, bar_width, content_rect.height)
+        pygame.draw.rect(self.screen, self.colors['bg_surface'], self.scroll_bar_rect)
+        pygame.draw.rect(self.screen, self.colors['border'], self.scroll_bar_rect, 1)
+
+        # Scrollbar handle
+        total_height = self.max_scroll_y + view_height
+        handle_height = max(20, (view_height / total_height) * view_height)
+        
+        scroll_ratio = self.scroll_y / self.max_scroll_y if self.max_scroll_y > 0 else 0
+        handle_y = self.scroll_bar_rect.y + scroll_ratio * (self.scroll_bar_rect.height - handle_height)
+
+        self.scroll_handle_rect = pygame.Rect(self.scroll_bar_rect.x, handle_y, bar_width, handle_height)
+        
+        # Handle hover state
+        mouse_pos = pygame.mouse.get_pos()
+        hover = self.scroll_handle_rect.collidepoint(mouse_pos) or self.is_scrolling
+        handle_color = self.colors['primary_dark'] if hover else self.colors['primary']
+        
+        pygame.draw.rect(self.screen, handle_color, self.scroll_handle_rect)
     

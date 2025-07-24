@@ -2,3 +2,8 @@ scores.db
 todo.txt
 flags.db
 __pycache__/
+venv/
+.venv/
+build/
+dist/
+FlagGuessr.spec

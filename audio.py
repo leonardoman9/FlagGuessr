@@ -1,6 +1,10 @@
 from pygame import mixer
 import os
 import random
+from scripts import resource_path
+
+# Music directory
+music_dir = resource_path("data/music")
 
 # Global variables for music state
 current_song = None
@@ -20,7 +24,7 @@ def init_mixer():
 def get_available_songs():
     """Get list of available music files"""
     try:
-        song_files = [f for f in os.listdir("data/music") if f.endswith(".mp3")]
+        song_files = [f for f in os.listdir(music_dir) if f.endswith(".mp3")]
         return song_files
     except Exception as e:
         print(f"Error loading song list: {e}")
@@ -64,7 +68,7 @@ def playMusic(song_name=None, random_song=False):
                 print(f"Song '{song_name}' not found, playing random song")
                 selected_song = random.choice(song_files)
         
-        song_path = os.path.join("data/music", selected_song)
+        song_path = os.path.join(music_dir, selected_song)
         mixer.music.load(song_path)
         mixer.music.play(-1)  # -1 makes the music loop indefinitely
         mixer.music.set_volume(music_volume)
