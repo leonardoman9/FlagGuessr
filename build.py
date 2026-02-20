@@ -1,4 +1,3 @@
-import PyInstaller.__main__
 import os
 import sys
 import shutil
@@ -17,11 +16,7 @@ def build():
         '--windowed', # Re-enabled to create a proper app
         '--icon=./data/icon.ico',
         '--add-data=data:data',
-        '--add-data=countries.py:.',
-        '--add-data=audio.py:.',
-        '--add-data=db.py:.',
-        '--add-data=gui.py:.',
-        '--add-data=scripts.py:.',
+        '--collect-submodules=flagguessr',
         '--hidden-import=pygame'
     ]
 
@@ -40,11 +35,17 @@ def build():
     if os.path.exists(f'{app_name}.spec'):
         os.remove(f'{app_name}.spec')
 
+    try:
+        import PyInstaller.__main__ as pyinstaller_main
+    except ModuleNotFoundError:
+        print("PyInstaller is not installed. Install it with: python3 -m pip install pyinstaller")
+        return 1
+
     # Run PyInstaller
     full_command = [script] + pyinstaller_options
     print(f"Running PyInstaller with command: {' '.join(full_command)}")
-    
-    PyInstaller.__main__.run(full_command)
+
+    pyinstaller_main.run(full_command)
 
     print("\n\nBuild process completed.")
     
@@ -55,7 +56,8 @@ def build():
         print(f"Application bundle created in: dist/{app_name}.app")
     else:
         print(f"Executable created in: dist/{app_name}")
+    return 0
 
 
 if __name__ == "__main__":
-    build() 
+    raise SystemExit(build())

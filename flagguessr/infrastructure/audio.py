@@ -1,7 +1,9 @@
-from pygame import mixer
 import os
 import random
-from scripts import resource_path
+
+from pygame import mixer
+
+from flagguessr.shared.paths import resource_path
 
 # Music directory
 music_dir = resource_path("data/music")
@@ -43,7 +45,7 @@ def get_song_names():
         display_names.append(name)
     return display_names
 
-def playMusic(song_name=None, random_song=False):
+def play_music(song_name=None, random_song=False):
     """Play music - either specific song or random"""
     global current_song, music_paused
     try:
@@ -87,7 +89,7 @@ def playMusic(song_name=None, random_song=False):
         print(f"Error while loading music: {e}")
         return False
 
-def pauseMusic():
+def pause_music():
     """Pause/unpause music"""
     global music_paused
     try:
@@ -102,7 +104,7 @@ def pauseMusic():
     except Exception as e:
         print(f"Error pausing/resuming music: {e}")
 
-def stopMusic():
+def stop_music():
     """Stop music completely"""
     global current_song, music_paused
     try:
@@ -113,7 +115,7 @@ def stopMusic():
     except Exception as e:
         print(f"Error stopping music: {e}")
 
-def setVolume(volume):
+def set_volume(volume):
     """Set music volume (0.0 to 1.0)"""
     global music_volume
     try:
@@ -134,3 +136,20 @@ def is_paused():
 def get_current_song():
     """Get currently playing song"""
     return current_song
+
+
+# Backward-compatible wrappers used by older call sites.
+def playMusic(song_name=None, random_song=False):
+    return play_music(song_name=song_name, random_song=random_song)
+
+
+def pauseMusic():
+    return pause_music()
+
+
+def stopMusic():
+    return stop_music()
+
+
+def setVolume(volume):
+    return set_volume(volume)

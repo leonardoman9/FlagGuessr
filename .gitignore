@@ -2,6 +2,9 @@ scores.db
 todo.txt
 flags.db
 __pycache__/
+**/__pycache__/
+*.pyc
+.DS_Store
 venv/
 .venv/
 build/

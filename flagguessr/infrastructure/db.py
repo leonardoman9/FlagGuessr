@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from scripts import resource_path
+from flagguessr.shared.paths import resource_path
 
 # --- Database Initialization ---
 

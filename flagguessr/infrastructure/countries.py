@@ -1,13 +1,16 @@
-import pygame
 import os
 import sqlite3
-from scripts import resource_path
 
-class countries:
+import pygame
+
+from flagguessr.shared.paths import resource_path
+
+
+class CountryLoader:
     def __init__(self):
         self.base_flags_path = resource_path("data/flags")
 
-    def load_flags_images(self, countries, size):
+    def load_flag_images(self, countries, size):
         flags_images = {}
         for country, continent in countries.items():
             continent_path = os.path.join(self.base_flags_path, continent)
@@ -41,4 +44,7 @@ class countries:
         countries_data = {row[0]: row[1] for row in cursor.fetchall()}
         conn.close()
         return countries_data
-     
+
+
+# Backward-compatible alias kept for legacy references.
+countries = CountryLoader

@@ -4,15 +4,15 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import db
-import scripts
+from flagguessr.infrastructure import db
+from flagguessr.shared import paths
 
 
 class TestCoreLogic(unittest.TestCase):
     def test_resource_path_uses_module_directory(self):
-        expected_base = os.path.dirname(os.path.abspath(scripts.__file__))
+        expected_base = os.path.abspath(os.path.join(os.path.dirname(paths.__file__), "..", ".."))
         expected = os.path.join(expected_base, "data/icon.ico")
-        self.assertEqual(scripts.resource_path("data/icon.ico"), expected)
+        self.assertEqual(paths.resource_path("data/icon.ico"), expected)
 
     def test_populate_flags_database_syncs_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -25,7 +25,7 @@ class TestCoreLogic(unittest.TestCase):
 
             db_path = os.path.join(tmpdir, "flags.db")
 
-            with patch("db.resource_path", side_effect=lambda rel: os.path.join(tmpdir, rel)):
+            with patch("flagguessr.infrastructure.db.resource_path", side_effect=lambda rel: os.path.join(tmpdir, rel)):
                 db.populate_flags_database(db_path)
 
             conn = sqlite3.connect(db_path)
@@ -38,7 +38,7 @@ class TestCoreLogic(unittest.TestCase):
             os.remove(os.path.join(flags_root, "asia", "japan.png"))
             open(os.path.join(flags_root, "europe", "france.png"), "wb").close()
 
-            with patch("db.resource_path", side_effect=lambda rel: os.path.join(tmpdir, rel)):
+            with patch("flagguessr.infrastructure.db.resource_path", side_effect=lambda rel: os.path.join(tmpdir, rel)):
                 db.populate_flags_database(db_path)
 
             conn = sqlite3.connect(db_path)
