@@ -37,6 +37,10 @@ selected_map = "europe"
 flags_shown_count = 0
 game_start_time = 0
 blitz_time_limit = 60
+game_countries = {}
+game_flags_images = {}
+countries_list = []
+current_country = None
 
 # --- State Management ---
 current_state = "splash"
@@ -105,8 +109,17 @@ while running:
                             game_start_time = pygame.time.get_ticks()
                         
                         game_countries = countries.load_countries(db_flags, selected_map.lower())
+                        if not game_countries:
+                            g.show_error_message("No countries found for the selected map.")
+                            continue
+
                         game_flags_images = countries.load_flags_images(game_countries, g.getFlagSize())
-                        current_country = random.choice(list(game_countries.keys()))
+                        if not game_flags_images:
+                            g.show_error_message("No flag images available for the selected map.")
+                            continue
+
+                        available_country_names = list(game_flags_images.keys())
+                        current_country = random.choice(available_country_names)
                         countries_list = [current_country]
                         if selected_game_mode != "normal":
                             flags_shown_count = 1
@@ -119,6 +132,12 @@ while running:
             if elapsed_time >= blitz_time_limit:
                 db.insert_score(db_scores, score, countries_list, wrong_countries, selected_map, selected_game_mode, blitz_time_limit, flags_shown_count, {})
                 change_state("game_over")
+                continue
+
+        if not game_flags_images:
+            g.show_error_message("No flags loaded. Returning to mode selection.")
+            change_state("mode_selection")
+            continue
         
         g.showGame(current_country, score, game_flags_images, lives, selected_game_mode, game_start_time, blitz_time_limit, flags_shown_count)
         
@@ -134,11 +153,12 @@ while running:
                 g.handle_game_music_click(mouse_pos)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    if g.get_input_text().lower() == current_country.lower():
+                    user_guess = g.get_input_text().strip().lower()
+                    if user_guess == current_country.lower():
                         score += 1
                         g.clear_error_message()
                         if selected_game_mode == "normal":
-                            available_countries = [c for c in game_countries.keys() if c not in countries_list]
+                            available_countries = [c for c in game_flags_images.keys() if c not in countries_list]
                             if available_countries:
                                 current_country = random.choice(available_countries)
                                 countries_list.append(current_country)
@@ -146,7 +166,7 @@ while running:
                                 db.insert_score(db_scores, score, countries_list, wrong_countries, selected_map, selected_game_mode, 0, len(countries_list), {"completion": True})
                                 change_state("victory")
                         else:
-                            current_country = random.choice(list(game_countries.keys()))
+                            current_country = random.choice(list(game_flags_images.keys()))
                             countries_list.append(current_country)
                             flags_shown_count += 1
                         g.set_input_text("")
@@ -162,14 +182,14 @@ while running:
                             change_state("game_over")
                         else:
                             if selected_game_mode == "normal":
-                                available_countries = [c for c in game_countries.keys() if c not in countries_list]
+                                available_countries = [c for c in game_flags_images.keys() if c not in countries_list]
                                 if available_countries:
                                     current_country = random.choice(available_countries)
                                     countries_list.append(current_country)
                                 else: # Should not happen if lives > 0
                                     change_state("victory")
                             else:
-                                current_country = random.choice(list(game_countries.keys()))
+                                current_country = random.choice(list(game_flags_images.keys()))
                                 countries_list.append(current_country)
                                 flags_shown_count += 1
                         g.set_input_text("")
@@ -249,4 +269,3 @@ while running:
                         change_state("splash")
                     else:
                         change_state("rankings")
-

@@ -25,7 +25,9 @@ def resource_path(relative_path):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
+        # Use the directory that contains this file so launching from a
+        # different cwd does not break asset resolution.
+        base_path = os.path.dirname(os.path.abspath(__file__))
 
     return os.path.join(base_path, relative_path)
 
@@ -33,5 +35,4 @@ def resource_path(relative_path):
 def showFlag(screen, flags ,current_country, width,  height, flag_size,):
         screen.fill((0, 0, 0))  # Set background color to black
         screen.blit(flags[current_country], (width // 2 - flag_size[0] // 2, height // 2 - flag_size[1] // 2))
-
 

@@ -112,30 +112,43 @@ def populate_flags_database(db_path):
                             );"""
     create_table(conn, sql_create_flags_table)
 
-    # Check if table is already populated
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) from flags")
-    if cursor.fetchone()[0] > 0:
-        print("Flags database is already populated.")
-        conn.close()
-        return
-
-    print("Populating flags database...")
+    print("Syncing flags database with asset files...")
     base_flags_path = resource_path("data/flags")
     continents = ['africa', 'america', 'asia', 'europe', 'oceania']
-    
+
+    discovered = {}
     for continent in continents:
         continent_path = os.path.join(base_flags_path, continent)
         try:
             for filename in os.listdir(continent_path):
                 if filename.endswith(".png"):
                     country_name = os.path.splitext(filename)[0]
-                    sql = '''INSERT INTO flags(country, continent) VALUES(?,?)'''
-                    cursor.execute(sql, (country_name, continent))
+                    discovered[country_name] = continent
         except FileNotFoundError:
             print(f"Warning: Directory not found for continent: {continent}")
             continue
-            
+
+    cursor.execute("SELECT country, continent FROM flags")
+    existing = {country: continent for country, continent in cursor.fetchall()}
+
+    inserted = 0
+    updated = 0
+    removed = 0
+
+    for country, continent in discovered.items():
+        if country not in existing:
+            cursor.execute("INSERT INTO flags(country, continent) VALUES(?, ?)", (country, continent))
+            inserted += 1
+        elif existing[country] != continent:
+            cursor.execute("UPDATE flags SET continent = ? WHERE country = ?", (continent, country))
+            updated += 1
+
+    stale_countries = set(existing.keys()) - set(discovered.keys())
+    for country in stale_countries:
+        cursor.execute("DELETE FROM flags WHERE country = ?", (country,))
+        removed += 1
+
     conn.commit()
     conn.close()
-    print("Flags database populated successfully.")
+    print(f"Flags database synced. Inserted: {inserted}, Updated: {updated}, Removed: {removed}")
